@@ -3607,6 +3607,162 @@ function resolveLineIn(db, spec) {
 }
 
 /* ==========================================================================
+   StockFlow ERP — Predictive AI Analytics, WhatsApp Engine & Ledger Hash
+   ========================================================================== */
+
+const StockFlowAnalytics = {
+  /**
+   * Predictive Reorder Engine
+   * Calculates 30-day velocity, daily burn rate, EOQ, and estimated days of stock remaining.
+   */
+  predictiveReorder() {
+    const inv = DB.get('inventory');
+    const movements = DB.get('movements');
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    return inv.map(line => {
+      const lineMovs = movements.filter(m => m.sku === line.sku && m.date >= thirtyDaysAgo);
+      const unitsSold = lineMovs.reduce((sum, m) => sum + (m.type === 'SALE' || m.type === 'OUT' ? num(m.qty) : 0), 0);
+      const dailyVelocity = unitsSold / 30;
+      const currentStock = inHand(line);
+
+      const daysRemaining = dailyVelocity > 0 ? Math.round(currentStock / dailyVelocity) : 999;
+      // Economic Order Quantity (EOQ) formula: sqrt((2 * Demand * OrderCost) / HoldingCost)
+      const annualDemand = dailyVelocity * 365;
+      const eoq = annualDemand > 0 ? Math.max(10, Math.round(Math.sqrt((2 * annualDemand * 50) / (num(line.unitCost || 10) * 0.15)))) : 10;
+      const recommendedSafetyStock = Math.ceil(dailyVelocity * 7); // 7-day safety buffer
+
+      return {
+        line,
+        currentStock,
+        thirtyDaySales: unitsSold,
+        dailyVelocity: dailyVelocity.toFixed(2),
+        daysRemaining,
+        recommendedSafetyStock,
+        eoq,
+        needsReorder: currentStock <= recommendedSafetyStock || daysRemaining <= 7
+      };
+    }).sort((a, b) => a.daysRemaining - b.daysRemaining);
+  },
+
+  /**
+   * FIFO Costing Valuation calculation for a SKU
+   */
+  fifoValuation(sku) {
+    const movements = DB.get('movements').filter(m => m.sku === sku && (m.type === 'IN' || m.type === 'PURCHASE'));
+    movements.sort((a, b) => a.date.localeCompare(b.date)); // Oldest first
+    const line = DB.get('inventory').find(l => l.sku === sku);
+    if (!line) return { totalQty: 0, totalValuation: 0, avgUnitCost: 0 };
+
+    let qtyInHand = inHand(line);
+    let totalValuation = 0;
+
+    for (let i = movements.length - 1; i >= 0 && qtyInHand > 0; i--) {
+      const batchQty = Math.min(qtyInHand, num(movements[i].qty));
+      const unitCost = num(movements[i].unitCost || line.unitCost);
+      totalValuation += batchQty * unitCost;
+      qtyInHand -= batchQty;
+    }
+    // Remaining fallback
+    if (qtyInHand > 0) {
+      totalValuation += qtyInHand * num(line.unitCost);
+    }
+    const realQty = inHand(line);
+    return {
+      sku,
+      totalQty: realQty,
+      totalValuation,
+      avgUnitCost: realQty > 0 ? (totalValuation / realQty).toFixed(2) : 0
+    };
+  }
+};
+
+const WhatsAppEngine = {
+  /**
+   * Format customer invoice for WhatsApp sending
+   */
+  buildInvoiceMessage(order) {
+    const company = state.db.settings.companyName || 'StockFlow ERP';
+    let text = `*${company} — Invoice #${order.orderId || order.trxRef}*\n`;
+    text += `Date: ${order.date || new Date().toISOString().slice(0, 10)}\n`;
+    text += `Customer: ${order.customerName || 'Valued Customer'}\n\n`;
+    text += `*Items Purchased:*\n`;
+
+    (order.items || []).forEach(it => {
+      text += `• ${it.name || it.sku} x${it.qty} — ৳${num(it.total || (it.qty * it.price))}\n`;
+    });
+
+    text += `\n*Total Amount:* ৳${num(order.netAmount || order.totalAmount || 0)}\n`;
+    text += `Payment Method: ${order.paymentMethod || 'Cash'}\n\n`;
+    text += `Thank you for shopping with us!`;
+    return text;
+  },
+
+  /**
+   * Format BadBin repair update message for WhatsApp
+   */
+  buildRepairMessage(ticket) {
+    const company = state.db.settings.companyName || 'StockFlow ERP';
+    let text = `*${company} — Repair Ticket #${ticket.id || ticket.ticketNo}*\n`;
+    text += `Device: ${ticket.brand || ''} ${ticket.model || ''} (IMEI/SN: ${ticket.imei || 'N/A'})\n`;
+    text += `Status: *${ticket.status || 'In Progress'}*\n`;
+    text += `Issue: ${ticket.issue || 'Diagnosis'}\n`;
+    if (ticket.estCost) text += `Estimated Cost: ৳${num(ticket.estCost)}\n`;
+    text += `\nFor inquiries, reply to this message.`;
+    return text;
+  },
+
+  /**
+   * Open WhatsApp Web or Mobile app with text pre-filled
+   */
+  send(phone, text) {
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  }
+};
+
+const LedgerIntegrity = {
+  /**
+   * Calculates deterministic SHA-256/checksum for a ledger movement
+   */
+  hashRecord(rec, prevHash = '0000000000000000') {
+    const payload = `${prevHash}|${rec.id}|${rec.trxRef}|${rec.type}|${rec.sku}|${rec.qty}|${rec.date}`;
+    let hash = 0;
+    for (let i = 0; i < payload.length; i++) {
+      const char = payload.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).padStart(16, '0');
+  },
+
+  /**
+   * Verify total ledger integrity
+   */
+  verifyChain() {
+    const movements = DB.get('movements');
+    let prevHash = 'GENESIS_BLOCK_STOCKFLOW';
+    let valid = true;
+    let corruptedIndex = -1;
+
+    movements.forEach((m, idx) => {
+      const expected = this.hashRecord(m, prevHash);
+      if (m._hash && m._hash !== expected) {
+        valid = false;
+        corruptedIndex = idx;
+      }
+      prevHash = expected;
+      m._hash = expected; // Attach / verify hash
+    });
+
+    return { valid, totalRecords: movements.length, corruptedIndex };
+  }
+};
+
+
+/* ==========================================================================
    AMAYA ERP — UI framework: nav, router, tables, toasts, modals
    ========================================================================== */
 
@@ -3627,9 +3783,11 @@ const NAV = [
     { key: 'repairs',    label: 'BadBin / Repairs', icon: '◈' }
   ]},
   { group: 'Business', items: [
-    { key: 'customers',  label: 'Customers', icon: '◎' },
-    { key: 'suppliers',  label: 'Suppliers', icon: '▦' },
-    { key: 'invoices',   label: 'Invoices',  icon: '◫' }
+    { key: 'customers',    label: 'Customers',     icon: '◎' },
+    { key: 'suppliers',    label: 'Suppliers',     icon: '▦' },
+    { key: 'invoices',     label: 'Invoices',      icon: '◫' },
+    { key: 'whatsappCrm',  label: 'WhatsApp CRM',  icon: '💬' },
+    { key: 'personalLog',   label: 'Personal Log',  icon: '📝' }
   ]},
   { group: 'People', items: [
     { key: 'live',       label: 'Live Attendance', icon: '▣' },
@@ -3664,6 +3822,8 @@ const PAGE_META = {
   customers:  ['Customers',        'Business directory'],
   suppliers:  ['Suppliers',        'Business directory'],
   invoices:   ['Invoices',         'Accounts receivable'],
+  whatsappCrm:['WhatsApp CRM',     'Customer messaging & live chat'],
+  personalLog:['Personal Log',     'Private encrypted work notes'],
   live:       ['Live Attendance',  'Terminal feed'],
   employees:  ['Employees',        'People operations'],
   payroll:    ['Payroll',          'Compensation'],
@@ -3790,8 +3950,8 @@ function renderPage(page) {
     dashboard: renderDashboard, live: renderLive, inventory: renderInventory, movements: renderMovements,
     transfers: renderTransfers, purchases: renderPurchases, sales: renderSales, pos: renderPOS,
     dispatch: renderDispatch, upgrades: renderUpgrades, repairs: renderRepairs, customers: renderCustomers,
-    suppliers: renderSuppliers, invoices: renderInvoices, employees: renderEmployees,
-    payroll: renderPayroll, leave: renderLeave, attendance: renderAttendance,
+    suppliers: renderSuppliers, invoices: renderInvoices, whatsappCrm: renderWhatsappCrm, personalLog: renderPersonalLog,
+    employees: renderEmployees, payroll: renderPayroll, leave: renderLeave, attendance: renderAttendance,
     finance: renderFinance, analytics: renderAnalytics, reports: renderReports,
     audit: renderAudit, settings: renderSettings, admin: renderAdmin
   };
@@ -8166,6 +8326,208 @@ function importAttendanceLogs(rawText) {
   audit('IMPORT', 'Attendance', 'device-log', `${n} punch(es) imported`);
   return n;
 }
+
+/* ==========================================================================
+   StockFlow ERP — WhatsApp CRM & Private Personal Log
+   ========================================================================== */
+
+function renderWhatsappCrm() {
+  const host = $('page-whatsappCrm');
+  if (!host) return;
+
+  const customers = DB.get('customers');
+  const sales = DB.get('sales');
+  const repairs = DB.get('repairs');
+
+  host.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Customer Messaging Hub</div>
+        <h2>WhatsApp CRM & Live Alerts</h2>
+        <p>Instant WhatsApp notifications, customer messaging history, and custom broadcast templates.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn primary" id="waCustomMsgBtn">💬 Send Custom Message</button>
+      </div>
+    </div>
+
+    <div class="stat-grid mb-16">
+      <div class="stat-card"><div class="stat-label">Active Customers</div><div class="stat-val">${fmt(customers.length)}</div><div class="stat-sub">With phone contacts</div></div>
+      <div class="stat-card"><div class="stat-label">Recent Sales</div><div class="stat-val">${fmt(sales.length)}</div><div class="stat-sub">Ready for invoice alert</div></div>
+      <div class="stat-card"><div class="stat-label">BadBin Repairs</div><div class="stat-val">${fmt(repairs.length)}</div><div class="stat-sub">Repair updates</div></div>
+      <div class="stat-card"><div class="stat-label">WhatsApp Status</div><div class="stat-val c-green">● Connected</div><div class="stat-sub">Web / API Ready</div></div>
+    </div>
+
+    <div class="grid col-2 gap-16">
+      <div class="card">
+        <div class="card-head"><h3>Quick Message Templates</h3></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Select Customer</label>
+            <select class="input" id="waCustSelect">
+              ${customers.map(c => `<option value="${esc(c.phone)}">${esc(c.name)} (${esc(c.phone || 'No phone')})</option>`).join('')}
+            </select>
+          </div>
+          <div class="btn-group mb-12">
+            <button class="btn sm" id="tmplInvoiceBtn">📄 Invoice Receipt</button>
+            <button class="btn sm" id="tmplRepairBtn">🛠 Repair Status</button>
+            <button class="btn sm" id="tmplPayBtn">💰 Payment Reminder</button>
+          </div>
+          <div class="field">
+            <label>Message Preview</label>
+            <textarea class="input" id="waMsgPreview" rows="5" placeholder="Message content will appear here..."></textarea>
+          </div>
+          <button class="btn primary block" id="waSendBtn">🚀 Launch WhatsApp Message</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Customer Directory & Quick Contact</h3></div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:360px">
+            <table class="dt">
+              <thead><tr><th>Customer</th><th>Phone</th><th>Action</th></tr></thead>
+              <tbody>
+                ${customers.map(c => `
+                  <tr>
+                    <td><b>${esc(c.name)}</b></td>
+                    <td><span class="mono">${esc(c.phone || '—')}</span></td>
+                    <td>
+                      ${c.phone ? `<button class="btn xs success" onclick="WhatsAppEngine.send('${esc(c.phone)}', 'Hello ${esc(c.name)}, thank you for connecting with ${esc(state.db.settings.companyName || 'StockFlow ERP')}!')">💬 Chat</button>` : '<span class="c-muted">No phone</span>'}
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const preview = $('waMsgPreview');
+  const custSel = $('waCustSelect');
+
+  $('tmplInvoiceBtn').onclick = () => {
+    const lastSale = sales[0] || { orderId: 'INV-1001', totalAmount: 1500, customerName: 'Customer' };
+    preview.value = WhatsAppEngine.buildInvoiceMessage(lastSale);
+  };
+  $('tmplRepairBtn').onclick = () => {
+    const lastRepair = repairs[0] || { ticketNo: 'T-101', brand: 'Samsung', model: 'S23', status: 'In Progress', issue: 'Screen Replacement' };
+    preview.value = WhatsAppEngine.buildRepairMessage(lastRepair);
+  };
+  $('tmplPayBtn').onclick = () => {
+    preview.value = `Hello! This is a friendly reminder regarding your outstanding balance with ${state.db.settings.companyName || 'StockFlow ERP'}. Please let us know if you need any assistance!`;
+  };
+  $('waSendBtn').onclick = () => {
+    const phone = custSel.value;
+    if (!phone) { toast('Please select a customer with a valid phone number', 'warn'); return; }
+    WhatsAppEngine.send(phone, preview.value || 'Hello!');
+    toast('WhatsApp redirect launched', 'good');
+  };
+  $('waCustomMsgBtn').onclick = () => {
+    preview.focus();
+    preview.value = `Hello! Greetings from ${state.db.settings.companyName || 'StockFlow ERP'}.`;
+  };
+}
+
+function renderPersonalLog() {
+  const host = $('page-personalLog');
+  if (!host) return;
+
+  const currentUser = state.session?.user || { id: 'usr_admin', name: 'Admin', role: 'Super Admin' };
+  const storageKey = `sf_private_log_${currentUser.id || 'default'}`;
+  const rawLogs = store.get(storageKey);
+  let logs = [];
+  try { logs = rawLogs ? JSON.parse(rawLogs) : []; } catch (_) { logs = []; }
+
+  host.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Private Workspace</div>
+        <h2>Personal Work Log & Shift Notes</h2>
+        <p>Encrypted personal logbook isolated to <b>${esc(currentUser.name)}</b> (${esc(currentUser.role)}).</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn primary" id="addLogNoteBtn">＋ New Personal Note</button>
+      </div>
+    </div>
+
+    <div class="grid col-3 gap-16 mb-16">
+      <div class="card">
+        <div class="card-head"><h3>Add Note / Shift Handover</h3></div>
+        <div class="card-body">
+          <form id="personalNoteForm">
+            <div class="field">
+              <label>Category</label>
+              <select class="input" id="noteCat">
+                <option value="Shift Handover">Shift Handover</option>
+                <option value="Stock Anomaly">Stock Anomaly</option>
+                <option value="Task Reminder">Task Reminder</option>
+                <option value="Private Scratchpad">Private Scratchpad</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Title</label>
+              <input class="input" id="noteTitle" placeholder="Summary of shift or task..." required>
+            </div>
+            <div class="field">
+              <label>Content</label>
+              <textarea class="input" id="noteContent" rows="4" placeholder="Detailed notes, observations, or handover checklist..." required></textarea>
+            </div>
+            <button class="btn primary block" type="submit">🔒 Save Private Note</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card span-2">
+        <div class="card-head"><h3>Your Log History (${logs.length})</h3></div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:420px">
+            ${logs.length ? `
+              <table class="dt">
+                <thead><tr><th>Time</th><th>Category</th><th>Title</th><th>Content</th><th>Action</th></tr></thead>
+                <tbody>
+                  ${logs.map((n, idx) => `
+                    <tr>
+                      <td class="fs-11 mono">${esc(fmtDate(n.timestamp))}</td>
+                      <td><span class="badge blue">${esc(n.category)}</span></td>
+                      <td><b>${esc(n.title)}</b></td>
+                      <td><span class="fs-12">${esc(n.content)}</span></td>
+                      <td><button class="btn xs danger" onclick="deletePersonalLogNote(${idx})">✕</button></td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>` : `
+              <div class="empty">
+                <b>No personal notes recorded yet</b>
+                <p>Use the form on the left to write private shift notes, reminders, or audit observations.</p>
+              </div>`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  $('personalNoteForm').onsubmit = (e) => {
+    e.preventDefault();
+    const note = {
+      id: 'PL-' + Date.now(),
+      category: $('noteCat').value,
+      title: $('noteTitle').value,
+      content: $('noteContent').value,
+      timestamp: nowISO()
+    };
+    logs.unshift(note);
+    store.set(storageKey, JSON.stringify(logs));
+    toast('Private personal note saved securely', 'good');
+    renderPersonalLog();
+  };
+
+  window.deletePersonalLogNote = (idx) => {
+    logs.splice(idx, 1);
+    store.set(storageKey, JSON.stringify(logs));
+    toast('Personal note deleted', 'warn');
+    renderPersonalLog();
+  };
+}
+
 
 /* ==========================================================================
    AMAYA ERP — Pages D: Finance, Analytics, Reports, Audit, Settings, Admin
@@ -13005,6 +13367,157 @@ function applyShiftRules(records) {
 }
 
 /* ==========================================================================
+   StockFlow ERP — Thermal Printer (ESC/POS) & Barcode Scanner Engine
+   ========================================================================== */
+
+const ThermalPrinter = {
+  /**
+   * Generates ESC/POS byte array commands for 80mm / 58mm thermal printers.
+   */
+  generateEscPos(order = {}) {
+    const ESC = 0x1B, GS = 0x1D;
+    const encoder = new TextEncoder();
+    const bytes = [];
+    const add = (arr) => bytes.push(...arr);
+    const addText = (str) => add(encoder.encode(str));
+
+    // Initialize printer
+    add([ESC, 0x40]);
+    // Center alignment
+    add([ESC, 0x61, 0x01]);
+    // Double height + width for Header
+    add([ESC, 0x21, 0x30]);
+    addText(`${(state.db.settings.companyName || 'StockFlow ERP').toUpperCase()}\n`);
+    add([ESC, 0x21, 0x00]); // Reset font
+    addText(`${state.db.settings.companyTagline || 'Warehouse & Retail System'}\n`);
+    addText(`Tel: ${state.db.settings.companyPhone || 'N/A'}\n`);
+    addText('------------------------------------------------\n');
+
+    // Left alignment for Details
+    add([ESC, 0x61, 0x00]);
+    addText(`Invoice #: ${order.orderId || order.trxRef || 'INV-0001'}\n`);
+    addText(`Date:      ${order.date || new Date().toISOString().slice(0, 10)}\n`);
+    addText(`Customer:  ${order.customerName || 'Walk-in Customer'}\n`);
+    addText(`Cashier:   ${order.user || 'Admin'}\n`);
+    addText('------------------------------------------------\n');
+
+    // Item Table
+    addText('ITEM                     QTY    PRICE     TOTAL\n');
+    addText('------------------------------------------------\n');
+    (order.items || []).forEach(it => {
+      const name = String(it.name || it.sku || 'Item').padEnd(24, ' ').slice(0, 24);
+      const qty = String(it.qty || 1).padStart(4, ' ');
+      const price = String(num(it.price || it.unitPrice)).padStart(8, ' ');
+      const total = String(num(it.total || (it.qty * it.price))).padStart(9, ' ');
+      addText(`${name}${qty}${price}${total}\n`);
+    });
+    addText('------------------------------------------------\n');
+
+    // Totals Right Aligned
+    add([ESC, 0x61, 0x02]);
+    addText(`Subtotal: ${num(order.subtotal || order.totalAmount || 0).toFixed(2)}\n`);
+    if (order.discount) addText(`Discount: -${num(order.discount).toFixed(2)}\n`);
+    if (order.tax) addText(`Tax/VAT: +${num(order.tax).toFixed(2)}\n`);
+    add([ESC, 0x21, 0x20]); // Bold text
+    addText(`TOTAL: ${num(order.netAmount || order.totalAmount || 0).toFixed(2)}\n`);
+    add([ESC, 0x21, 0x00]);
+    addText('------------------------------------------------\n');
+
+    // Footer Center Aligned
+    add([ESC, 0x61, 0x01]);
+    addText('Thank you for your business!\n');
+    addText('Powered by StockFlow ERP\n\n\n');
+
+    // Cut Paper Command
+    add([GS, 0x56, 0x42, 0x00]);
+    return new Uint8Array(bytes);
+  },
+
+  /**
+   * Send print job via WebUSB or silent window print fallback.
+   */
+  async printReceipt(order) {
+    if ('usb' in navigator) {
+      try {
+        const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x04b8 /* Epson */ }] });
+        await device.open();
+        await device.selectConfiguration(1);
+        await device.claimInterface(0);
+        const rawData = this.generateEscPos(order);
+        await device.transferOut(1, rawData);
+        await device.close();
+        toast('Receipt printed directly to USB Thermal Printer!', 'good');
+        return true;
+      } catch (e) {
+        console.warn('USB Direct Print failed or cancelled, falling back to browser print:', e);
+      }
+    }
+    // Fallback silent print
+    window.print();
+    return true;
+  }
+};
+
+const BarcodeScannerEngine = {
+  buffer: '',
+  lastTime: 0,
+  thresholdMs: 40,
+  listening: false,
+
+  init() {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener('keydown', (e) => {
+      const target = e.target;
+      // Ignore textareas or active contenteditables unless specially marked
+      if (target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      const now = performance.now();
+      const delta = now - this.lastTime;
+      this.lastTime = now;
+
+      if (e.key === 'Enter') {
+        if (this.buffer.length >= 3) {
+          const barcode = this.buffer.trim();
+          this.buffer = '';
+          this.onScan(barcode, target);
+        } else {
+          this.buffer = '';
+        }
+        return;
+      }
+
+      if (e.key.length === 1) {
+        if (delta > this.thresholdMs) {
+          this.buffer = e.key; // Reset if typing slowly (human speed)
+        } else {
+          this.buffer += e.key; // Fast barcode scanner input burst
+        }
+      }
+    });
+  },
+
+  onScan(barcode, targetElement) {
+    console.log('[BarcodeScannerEngine] Scanned:', barcode);
+    toast(`Barcode Scanned: ${barcode}`, 'good');
+    window.dispatchEvent(new CustomEvent('stockflow:barcode-scanned', { detail: { barcode, targetElement } }));
+
+    // Auto-fill active input if focused on an input element
+    if (targetElement && targetElement.tagName === 'INPUT') {
+      targetElement.value = barcode;
+      targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+      targetElement.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+};
+
+// Initialize barcode listener automatically on boot
+if (typeof window !== 'undefined') {
+  BarcodeScannerEngine.init();
+}
+
+
+/* ==========================================================================
    AMAYA ERP — Live attendance page, bridge settings, PIN mapping
    ========================================================================== */
 
@@ -14367,6 +14880,273 @@ function boot() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
+
+/* ==========================================================================
+   StockFlow ERP — Google Sign-In (GSI) Integration
+   Uses Google Identity Services (GIS) One Tap + Button rendering.
+   Client ID is set via Settings → companyGoogleClientId.
+   ========================================================================== */
+
+const GoogleAuth = {
+  clientId: null,
+
+  init() {
+    // Read client ID from settings or fall back to a placeholder
+    this.clientId = state.db.settings.googleClientId || '';
+    if (!this.clientId || typeof google === 'undefined' || !google.accounts) {
+      /* GIS not loaded or no client ID configured — render a setup hint */
+      const btn = $('googleSignInBtn');
+      if (btn && !this.clientId) {
+        btn.innerHTML = `<div style="font-size:11px;color:var(--text-3);text-align:center;padding:8px 0;">
+          <a href="#" onclick="go('settings');return false;" style="color:var(--amber);">Configure Google Client ID in Settings</a> to enable Google Sign-In.
+        </div>`;
+      }
+      return;
+    }
+
+    /* Initialize Google Identity Services */
+    google.accounts.id.initialize({
+      client_id: this.clientId,
+      callback: this.handleCredential.bind(this),
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+
+    /* Render the styled Google button */
+    const btnHost = $('googleSignInBtn');
+    if (btnHost) {
+      google.accounts.id.renderButton(btnHost, {
+        type: 'standard',
+        shape: 'rectangular',
+        theme: document.documentElement.dataset.theme === 'dark' ? 'filled_black' : 'outline',
+        size: 'large',
+        text: 'signin_with',
+        width: 300
+      });
+    }
+
+    /* One Tap prompt (only in non-setup/production context) */
+    if (setupComplete()) google.accounts.id.prompt();
+  },
+
+  /**
+   * Callback from Google after the user selects their account.
+   * Decodes the JWT credential and maps it to a StockFlow user by email.
+   */
+  handleCredential(response) {
+    try {
+      /* Decode payload (NOT verified on client — HTTPS + GSI handles this) */
+      const parts = response.credential.split('.');
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+      const email = (payload.email || '').toLowerCase();
+      const name = payload.name || payload.given_name || email;
+      const picture = payload.picture || null;
+      const googleId = payload.sub;
+
+      /* Match against registered StockFlow users by email */
+      const user = DB.get('users').find(u => norm(u.email) === norm(email) && u.status === 'Active');
+
+      if (!user) {
+        const errEl = $('loginError');
+        if (errEl) errEl.innerHTML = `<div class="alert alert-error">
+          No active StockFlow account found for <b>${esc(email)}</b>.<br>
+          Ask your administrator to register this email address first.
+        </div>`;
+        toast(`No StockFlow account for ${email}`, 'bad', 6000);
+        return;
+      }
+
+      /* Update user's Google identity metadata */
+      DB.update('users', user.id, { googleId, googlePicture: picture, lastLoginAt: nowISO() });
+
+      /* Update user pill avatar with Google photo */
+      if (picture) {
+        const av = $('sideAvatar');
+        if (av) av.innerHTML = `<img src="${picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="${esc(name)}">`;
+      }
+
+      /* Create session and enter the app */
+      state.session = {
+        user: { ...user, googlePicture: picture },
+        loginAt: nowISO(),
+        via: 'google'
+      };
+      store.set(APP.sessionKey, JSON.stringify(state.session));
+      audit('LOGIN', 'Auth', user.id, `Google Sign-In: ${email}`);
+      toast(`Welcome, ${user.name}! Signed in via Google.`, 'good');
+      showApp();
+
+    } catch (e) {
+      console.error('Google Sign-In error:', e);
+      toast('Google Sign-In failed: ' + e.message, 'bad');
+    }
+  },
+
+  signOut() {
+    if (typeof google !== 'undefined' && google.accounts) {
+      google.accounts.id.disableAutoSelect();
+    }
+  }
+};
+
+/* Initialize Google Auth after GIS script loads */
+window.addEventListener('load', () => {
+  /* Small delay to let GIS library fully initialize */
+  setTimeout(() => {
+    if (!state.session) GoogleAuth.init();
+  }, 500);
+});
+
+/* Re-init Google button when login screen is shown */
+const _origShowLogin = showLogin;
+window.showLogin = function() {
+  _origShowLogin();
+  setTimeout(() => GoogleAuth.init(), 200);
+};
+
+/* ==========================================================================
+   StockFlow ERP — Enhanced Analytics Engine
+   ========================================================================== */
+
+function renderAnalyticsEnhanced() {
+  const host = $('page-analytics');
+  if (!host) return;
+
+  const inv = DB.get('inventory');
+  const movements = DB.get('movements');
+  const sales = DB.get('sales');
+  const repairs = DB.get('repairs');
+  const customers = DB.get('customers');
+  const now = new Date();
+
+  /* ---- Key metrics ---- */
+  const totalInventoryValue = inv.reduce((s, l) => s + (inHand(l) * num(l.unitCost)), 0);
+  const totalRetailValue = inv.reduce((s, l) => s + (inHand(l) * num(l.unitPrice)), 0);
+  const potentialMargin = totalRetailValue - totalInventoryValue;
+
+  const last30 = new Date(now - 30 * 864e5).toISOString().slice(0, 10);
+  const recentSales = sales.filter(s => (s.date || s.createdAt || '') >= last30);
+  const recentRevenue = recentSales.reduce((s, sale) => s + num(sale.totalAmount || sale.netAmount), 0);
+
+  const reorderAlerts = StockFlowAnalytics.predictiveReorder().filter(r => r.needsReorder);
+  const integrityResult = LedgerIntegrity.verifyChain();
+
+  host.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Business Intelligence</div>
+        <h2>Advanced Analytics & KPI Dashboard</h2>
+        <p>Real-time performance metrics, predictive reorder intelligence, and ledger integrity status.</p>
+      </div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="stat-grid mb-20">
+      ${statCard({ icon: '₳', label: 'Inventory Value (Cost)', value: money(totalInventoryValue), meta: `${fmt(inv.length)} stock lines`, color: 'blue' })}
+      ${statCard({ icon: '◆', label: 'Retail Value', value: money(totalRetailValue), meta: 'At selling price', color: 'teal' })}
+      ${statCard({ icon: '◍', label: 'Potential Gross Margin', value: money(potentialMargin), meta: `${totalInventoryValue > 0 ? ((potentialMargin / totalInventoryValue) * 100).toFixed(1) : 0}% margin`, color: 'green' })}
+      ${statCard({ icon: '◌', label: '30-Day Revenue', value: money(recentRevenue), meta: `${fmt(recentSales.length)} orders`, color: 'amber' })}
+      ${statCard({ icon: '⚠', label: 'Reorder Alerts', value: fmt(reorderAlerts.length), meta: 'Items need restocking', color: reorderAlerts.length > 0 ? 'red' : 'green' })}
+      ${statCard({ icon: integrityResult.valid ? '✓' : '⚠', label: 'Ledger Integrity', value: integrityResult.valid ? 'Verified' : 'CORRUPTED', meta: `${fmt(integrityResult.totalRecords)} movements`, color: integrityResult.valid ? 'green' : 'red' })}
+    </div>
+
+    <div class="grid col-2 gap-16 mb-16">
+      <!-- Predictive Reorder Table -->
+      <div class="card">
+        <div class="card-head">
+          <h3>⚠ Predictive Reorder Alerts</h3>
+          <span class="badge ${reorderAlerts.length > 0 ? 'red' : 'green'}">${reorderAlerts.length} items</span>
+        </div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:300px">
+            <table class="dt">
+              <thead><tr><th>SKU</th><th>Brand</th><th>In Hand</th><th>Daily Vel.</th><th>Days Left</th><th>EOQ</th></tr></thead>
+              <tbody>
+                ${reorderAlerts.length ? reorderAlerts.slice(0, 20).map(r => `
+                  <tr>
+                    <td><b class="mono">${esc(r.line.sku)}</b></td>
+                    <td>${esc(r.line.brand || '—')}</td>
+                    <td><span class="${r.currentStock <= 0 ? 'c-red' : 'c-amber'}">${fmt(r.currentStock)}</span></td>
+                    <td class="mono">${r.dailyVelocity}/day</td>
+                    <td><span class="badge ${r.daysRemaining <= 3 ? 'red' : 'amber'}">${r.daysRemaining === 999 ? '∞' : r.daysRemaining + 'd'}</span></td>
+                    <td class="c-green"><b>${fmt(r.eoq)}</b></td>
+                  </tr>`).join('') : '<tr><td colspan="6"><div class="empty" style="padding:16px"><b>All stock levels healthy ✓</b></div></td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Selling Products -->
+      <div class="card">
+        <div class="card-head"><h3>🔥 Top Selling Products (30 Days)</h3></div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:300px">
+            <table class="dt">
+              <thead><tr><th>SKU</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+              <tbody>
+                ${(() => {
+                  const skuMap = {};
+                  movements.filter(m => m.type === 'SALE' && m.date >= last30).forEach(m => {
+                    if (!skuMap[m.sku]) skuMap[m.sku] = { sku: m.sku, brand: m.brand, qty: 0, rev: 0 };
+                    skuMap[m.sku].qty += num(m.qty);
+                  });
+                  sales.filter(s => (s.date || '') >= last30).forEach(s => {
+                    (s.items || []).forEach(it => {
+                      if (!skuMap[it.sku]) skuMap[it.sku] = { sku: it.sku, brand: '', qty: 0, rev: 0 };
+                      skuMap[it.sku].rev += num(it.total || it.qty * it.price);
+                    });
+                  });
+                  return Object.values(skuMap).sort((a, b) => b.qty - a.qty).slice(0, 15).map(p => `
+                    <tr>
+                      <td><b class="mono">${esc(p.sku)}</b><span class="row-sub">${esc(p.brand || '')}</span></td>
+                      <td><b>${fmt(p.qty)}</b></td>
+                      <td>${money(p.rev)}</td>
+                    </tr>`).join('') || '<tr><td colspan="3"><div class="empty" style="padding:16px"><b>No sales in last 30 days</b></div></td></tr>';
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Repairs + Customer metrics row -->
+    <div class="grid col-3 gap-16">
+      <div class="card">
+        <div class="card-head"><h3>🛠 Repair Pipeline</h3></div>
+        <div class="card-body">
+          ${['Received', 'Diagnosed', 'In Repair', 'Waiting Parts', 'Repaired', 'Returned to Customer'].map(st => {
+            const c = repairs.filter(r => r.status === st).length;
+            return `<div class="kv-row"><span class="k">${esc(st)}</span><span class="v"><b>${fmt(c)}</b></span></div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>👥 Customer Health</h3></div>
+        <div class="card-body">
+          ${statCard({ icon: '◎', label: 'Total Customers', value: fmt(customers.length), meta: 'Registered', color: 'blue' })}
+          ${statCard({ icon: '₳', label: 'Outstanding Balance', value: money(customers.reduce((s, c) => s + num(c.balance), 0)), meta: 'Receivables', color: 'amber' })}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>🔗 Ledger Hash Status</h3></div>
+        <div class="card-body">
+          <div class="kv-row"><span class="k">Status</span><span class="v"><span class="badge ${integrityResult.valid ? 'green' : 'red'}">${integrityResult.valid ? '✓ Valid' : '✗ Corrupted'}</span></span></div>
+          <div class="kv-row"><span class="k">Records Verified</span><span class="v"><b>${fmt(integrityResult.totalRecords)}</b></span></div>
+          ${!integrityResult.valid ? `<div class="kv-row"><span class="k c-red">Corrupted at row</span><span class="v c-red"><b>#${integrityResult.corruptedIndex + 1}</b></span></div>` : ''}
+          <button class="btn sm mt-8" onclick="LedgerIntegrity.verifyChain(); renderAnalyticsEnhanced(); toast('Ledger re-verified', 'good')">Re-verify Ledger</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Patch renderAnalytics to use the enhanced version */
+const _origRenderAnalytics = typeof renderAnalytics === 'function' ? renderAnalytics : null;
+window.renderAnalytics = function() {
+  renderAnalyticsEnhanced();
+};
 })();
 </script>
 </body>

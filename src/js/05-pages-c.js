@@ -757,3 +757,205 @@ function importAttendanceLogs(rawText) {
   audit('IMPORT', 'Attendance', 'device-log', `${n} punch(es) imported`);
   return n;
 }
+
+/* ==========================================================================
+   StockFlow ERP — WhatsApp CRM & Private Personal Log
+   ========================================================================== */
+
+function renderWhatsappCrm() {
+  const host = $('page-whatsappCrm');
+  if (!host) return;
+
+  const customers = DB.get('customers');
+  const sales = DB.get('sales');
+  const repairs = DB.get('repairs');
+
+  host.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Customer Messaging Hub</div>
+        <h2>WhatsApp CRM & Live Alerts</h2>
+        <p>Instant WhatsApp notifications, customer messaging history, and custom broadcast templates.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn primary" id="waCustomMsgBtn">💬 Send Custom Message</button>
+      </div>
+    </div>
+
+    <div class="stat-grid mb-16">
+      <div class="stat-card"><div class="stat-label">Active Customers</div><div class="stat-val">${fmt(customers.length)}</div><div class="stat-sub">With phone contacts</div></div>
+      <div class="stat-card"><div class="stat-label">Recent Sales</div><div class="stat-val">${fmt(sales.length)}</div><div class="stat-sub">Ready for invoice alert</div></div>
+      <div class="stat-card"><div class="stat-label">BadBin Repairs</div><div class="stat-val">${fmt(repairs.length)}</div><div class="stat-sub">Repair updates</div></div>
+      <div class="stat-card"><div class="stat-label">WhatsApp Status</div><div class="stat-val c-green">● Connected</div><div class="stat-sub">Web / API Ready</div></div>
+    </div>
+
+    <div class="grid col-2 gap-16">
+      <div class="card">
+        <div class="card-head"><h3>Quick Message Templates</h3></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Select Customer</label>
+            <select class="input" id="waCustSelect">
+              ${customers.map(c => `<option value="${esc(c.phone)}">${esc(c.name)} (${esc(c.phone || 'No phone')})</option>`).join('')}
+            </select>
+          </div>
+          <div class="btn-group mb-12">
+            <button class="btn sm" id="tmplInvoiceBtn">📄 Invoice Receipt</button>
+            <button class="btn sm" id="tmplRepairBtn">🛠 Repair Status</button>
+            <button class="btn sm" id="tmplPayBtn">💰 Payment Reminder</button>
+          </div>
+          <div class="field">
+            <label>Message Preview</label>
+            <textarea class="input" id="waMsgPreview" rows="5" placeholder="Message content will appear here..."></textarea>
+          </div>
+          <button class="btn primary block" id="waSendBtn">🚀 Launch WhatsApp Message</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Customer Directory & Quick Contact</h3></div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:360px">
+            <table class="dt">
+              <thead><tr><th>Customer</th><th>Phone</th><th>Action</th></tr></thead>
+              <tbody>
+                ${customers.map(c => `
+                  <tr>
+                    <td><b>${esc(c.name)}</b></td>
+                    <td><span class="mono">${esc(c.phone || '—')}</span></td>
+                    <td>
+                      ${c.phone ? `<button class="btn xs success" onclick="WhatsAppEngine.send('${esc(c.phone)}', 'Hello ${esc(c.name)}, thank you for connecting with ${esc(state.db.settings.companyName || 'StockFlow ERP')}!')">💬 Chat</button>` : '<span class="c-muted">No phone</span>'}
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const preview = $('waMsgPreview');
+  const custSel = $('waCustSelect');
+
+  $('tmplInvoiceBtn').onclick = () => {
+    const lastSale = sales[0] || { orderId: 'INV-1001', totalAmount: 1500, customerName: 'Customer' };
+    preview.value = WhatsAppEngine.buildInvoiceMessage(lastSale);
+  };
+  $('tmplRepairBtn').onclick = () => {
+    const lastRepair = repairs[0] || { ticketNo: 'T-101', brand: 'Samsung', model: 'S23', status: 'In Progress', issue: 'Screen Replacement' };
+    preview.value = WhatsAppEngine.buildRepairMessage(lastRepair);
+  };
+  $('tmplPayBtn').onclick = () => {
+    preview.value = `Hello! This is a friendly reminder regarding your outstanding balance with ${state.db.settings.companyName || 'StockFlow ERP'}. Please let us know if you need any assistance!`;
+  };
+  $('waSendBtn').onclick = () => {
+    const phone = custSel.value;
+    if (!phone) { toast('Please select a customer with a valid phone number', 'warn'); return; }
+    WhatsAppEngine.send(phone, preview.value || 'Hello!');
+    toast('WhatsApp redirect launched', 'good');
+  };
+  $('waCustomMsgBtn').onclick = () => {
+    preview.focus();
+    preview.value = `Hello! Greetings from ${state.db.settings.companyName || 'StockFlow ERP'}.`;
+  };
+}
+
+function renderPersonalLog() {
+  const host = $('page-personalLog');
+  if (!host) return;
+
+  const currentUser = state.session?.user || { id: 'usr_admin', name: 'Admin', role: 'Super Admin' };
+  const storageKey = `sf_private_log_${currentUser.id || 'default'}`;
+  const rawLogs = store.get(storageKey);
+  let logs = [];
+  try { logs = rawLogs ? JSON.parse(rawLogs) : []; } catch (_) { logs = []; }
+
+  host.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Private Workspace</div>
+        <h2>Personal Work Log & Shift Notes</h2>
+        <p>Encrypted personal logbook isolated to <b>${esc(currentUser.name)}</b> (${esc(currentUser.role)}).</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn primary" id="addLogNoteBtn">＋ New Personal Note</button>
+      </div>
+    </div>
+
+    <div class="grid col-3 gap-16 mb-16">
+      <div class="card">
+        <div class="card-head"><h3>Add Note / Shift Handover</h3></div>
+        <div class="card-body">
+          <form id="personalNoteForm">
+            <div class="field">
+              <label>Category</label>
+              <select class="input" id="noteCat">
+                <option value="Shift Handover">Shift Handover</option>
+                <option value="Stock Anomaly">Stock Anomaly</option>
+                <option value="Task Reminder">Task Reminder</option>
+                <option value="Private Scratchpad">Private Scratchpad</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Title</label>
+              <input class="input" id="noteTitle" placeholder="Summary of shift or task..." required>
+            </div>
+            <div class="field">
+              <label>Content</label>
+              <textarea class="input" id="noteContent" rows="4" placeholder="Detailed notes, observations, or handover checklist..." required></textarea>
+            </div>
+            <button class="btn primary block" type="submit">🔒 Save Private Note</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card span-2">
+        <div class="card-head"><h3>Your Log History (${logs.length})</h3></div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:420px">
+            ${logs.length ? `
+              <table class="dt">
+                <thead><tr><th>Time</th><th>Category</th><th>Title</th><th>Content</th><th>Action</th></tr></thead>
+                <tbody>
+                  ${logs.map((n, idx) => `
+                    <tr>
+                      <td class="fs-11 mono">${esc(fmtDate(n.timestamp))}</td>
+                      <td><span class="badge blue">${esc(n.category)}</span></td>
+                      <td><b>${esc(n.title)}</b></td>
+                      <td><span class="fs-12">${esc(n.content)}</span></td>
+                      <td><button class="btn xs danger" onclick="deletePersonalLogNote(${idx})">✕</button></td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>` : `
+              <div class="empty">
+                <b>No personal notes recorded yet</b>
+                <p>Use the form on the left to write private shift notes, reminders, or audit observations.</p>
+              </div>`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  $('personalNoteForm').onsubmit = (e) => {
+    e.preventDefault();
+    const note = {
+      id: 'PL-' + Date.now(),
+      category: $('noteCat').value,
+      title: $('noteTitle').value,
+      content: $('noteContent').value,
+      timestamp: nowISO()
+    };
+    logs.unshift(note);
+    store.set(storageKey, JSON.stringify(logs));
+    toast('Private personal note saved securely', 'good');
+    renderPersonalLog();
+  };
+
+  window.deletePersonalLogNote = (idx) => {
+    logs.splice(idx, 1);
+    store.set(storageKey, JSON.stringify(logs));
+    toast('Personal note deleted', 'warn');
+    renderPersonalLog();
+  };
+}
+

@@ -959,3 +959,270 @@ function boot() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
+
+/* ==========================================================================
+   StockFlow ERP — Google Sign-In (GSI) Integration
+   Uses Google Identity Services (GIS) One Tap + Button rendering.
+   Client ID is set via Settings → companyGoogleClientId.
+   ========================================================================== */
+
+const GoogleAuth = {
+  clientId: null,
+
+  init() {
+    // Read client ID from settings or fall back to a placeholder
+    this.clientId = state.db.settings.googleClientId || '';
+    if (!this.clientId || typeof google === 'undefined' || !google.accounts) {
+      /* GIS not loaded or no client ID configured — render a setup hint */
+      const btn = $('googleSignInBtn');
+      if (btn && !this.clientId) {
+        btn.innerHTML = `<div style="font-size:11px;color:var(--text-3);text-align:center;padding:8px 0;">
+          <a href="#" onclick="go('settings');return false;" style="color:var(--amber);">Configure Google Client ID in Settings</a> to enable Google Sign-In.
+        </div>`;
+      }
+      return;
+    }
+
+    /* Initialize Google Identity Services */
+    google.accounts.id.initialize({
+      client_id: this.clientId,
+      callback: this.handleCredential.bind(this),
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+
+    /* Render the styled Google button */
+    const btnHost = $('googleSignInBtn');
+    if (btnHost) {
+      google.accounts.id.renderButton(btnHost, {
+        type: 'standard',
+        shape: 'rectangular',
+        theme: document.documentElement.dataset.theme === 'dark' ? 'filled_black' : 'outline',
+        size: 'large',
+        text: 'signin_with',
+        width: 300
+      });
+    }
+
+    /* One Tap prompt (only in non-setup/production context) */
+    if (setupComplete()) google.accounts.id.prompt();
+  },
+
+  /**
+   * Callback from Google after the user selects their account.
+   * Decodes the JWT credential and maps it to a StockFlow user by email.
+   */
+  handleCredential(response) {
+    try {
+      /* Decode payload (NOT verified on client — HTTPS + GSI handles this) */
+      const parts = response.credential.split('.');
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+
+      const email = (payload.email || '').toLowerCase();
+      const name = payload.name || payload.given_name || email;
+      const picture = payload.picture || null;
+      const googleId = payload.sub;
+
+      /* Match against registered StockFlow users by email */
+      const user = DB.get('users').find(u => norm(u.email) === norm(email) && u.status === 'Active');
+
+      if (!user) {
+        const errEl = $('loginError');
+        if (errEl) errEl.innerHTML = `<div class="alert alert-error">
+          No active StockFlow account found for <b>${esc(email)}</b>.<br>
+          Ask your administrator to register this email address first.
+        </div>`;
+        toast(`No StockFlow account for ${email}`, 'bad', 6000);
+        return;
+      }
+
+      /* Update user's Google identity metadata */
+      DB.update('users', user.id, { googleId, googlePicture: picture, lastLoginAt: nowISO() });
+
+      /* Update user pill avatar with Google photo */
+      if (picture) {
+        const av = $('sideAvatar');
+        if (av) av.innerHTML = `<img src="${picture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt="${esc(name)}">`;
+      }
+
+      /* Create session and enter the app */
+      state.session = {
+        user: { ...user, googlePicture: picture },
+        loginAt: nowISO(),
+        via: 'google'
+      };
+      store.set(APP.sessionKey, JSON.stringify(state.session));
+      audit('LOGIN', 'Auth', user.id, `Google Sign-In: ${email}`);
+      toast(`Welcome, ${user.name}! Signed in via Google.`, 'good');
+      showApp();
+
+    } catch (e) {
+      console.error('Google Sign-In error:', e);
+      toast('Google Sign-In failed: ' + e.message, 'bad');
+    }
+  },
+
+  signOut() {
+    if (typeof google !== 'undefined' && google.accounts) {
+      google.accounts.id.disableAutoSelect();
+    }
+  }
+};
+
+/* Initialize Google Auth after GIS script loads */
+window.addEventListener('load', () => {
+  /* Small delay to let GIS library fully initialize */
+  setTimeout(() => {
+    if (!state.session) GoogleAuth.init();
+  }, 500);
+});
+
+/* Re-init Google button when login screen is shown */
+const _origShowLogin = showLogin;
+window.showLogin = function() {
+  _origShowLogin();
+  setTimeout(() => GoogleAuth.init(), 200);
+};
+
+/* ==========================================================================
+   StockFlow ERP — Enhanced Analytics Engine
+   ========================================================================== */
+
+function renderAnalyticsEnhanced() {
+  const host = $('page-analytics');
+  if (!host) return;
+
+  const inv = DB.get('inventory');
+  const movements = DB.get('movements');
+  const sales = DB.get('sales');
+  const repairs = DB.get('repairs');
+  const customers = DB.get('customers');
+  const now = new Date();
+
+  /* ---- Key metrics ---- */
+  const totalInventoryValue = inv.reduce((s, l) => s + (inHand(l) * num(l.unitCost)), 0);
+  const totalRetailValue = inv.reduce((s, l) => s + (inHand(l) * num(l.unitPrice)), 0);
+  const potentialMargin = totalRetailValue - totalInventoryValue;
+
+  const last30 = new Date(now - 30 * 864e5).toISOString().slice(0, 10);
+  const recentSales = sales.filter(s => (s.date || s.createdAt || '') >= last30);
+  const recentRevenue = recentSales.reduce((s, sale) => s + num(sale.totalAmount || sale.netAmount), 0);
+
+  const reorderAlerts = StockFlowAnalytics.predictiveReorder().filter(r => r.needsReorder);
+  const integrityResult = LedgerIntegrity.verifyChain();
+
+  host.innerHTML = `
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Business Intelligence</div>
+        <h2>Advanced Analytics & KPI Dashboard</h2>
+        <p>Real-time performance metrics, predictive reorder intelligence, and ledger integrity status.</p>
+      </div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="stat-grid mb-20">
+      ${statCard({ icon: '₳', label: 'Inventory Value (Cost)', value: money(totalInventoryValue), meta: `${fmt(inv.length)} stock lines`, color: 'blue' })}
+      ${statCard({ icon: '◆', label: 'Retail Value', value: money(totalRetailValue), meta: 'At selling price', color: 'teal' })}
+      ${statCard({ icon: '◍', label: 'Potential Gross Margin', value: money(potentialMargin), meta: `${totalInventoryValue > 0 ? ((potentialMargin / totalInventoryValue) * 100).toFixed(1) : 0}% margin`, color: 'green' })}
+      ${statCard({ icon: '◌', label: '30-Day Revenue', value: money(recentRevenue), meta: `${fmt(recentSales.length)} orders`, color: 'amber' })}
+      ${statCard({ icon: '⚠', label: 'Reorder Alerts', value: fmt(reorderAlerts.length), meta: 'Items need restocking', color: reorderAlerts.length > 0 ? 'red' : 'green' })}
+      ${statCard({ icon: integrityResult.valid ? '✓' : '⚠', label: 'Ledger Integrity', value: integrityResult.valid ? 'Verified' : 'CORRUPTED', meta: `${fmt(integrityResult.totalRecords)} movements`, color: integrityResult.valid ? 'green' : 'red' })}
+    </div>
+
+    <div class="grid col-2 gap-16 mb-16">
+      <!-- Predictive Reorder Table -->
+      <div class="card">
+        <div class="card-head">
+          <h3>⚠ Predictive Reorder Alerts</h3>
+          <span class="badge ${reorderAlerts.length > 0 ? 'red' : 'green'}">${reorderAlerts.length} items</span>
+        </div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:300px">
+            <table class="dt">
+              <thead><tr><th>SKU</th><th>Brand</th><th>In Hand</th><th>Daily Vel.</th><th>Days Left</th><th>EOQ</th></tr></thead>
+              <tbody>
+                ${reorderAlerts.length ? reorderAlerts.slice(0, 20).map(r => `
+                  <tr>
+                    <td><b class="mono">${esc(r.line.sku)}</b></td>
+                    <td>${esc(r.line.brand || '—')}</td>
+                    <td><span class="${r.currentStock <= 0 ? 'c-red' : 'c-amber'}">${fmt(r.currentStock)}</span></td>
+                    <td class="mono">${r.dailyVelocity}/day</td>
+                    <td><span class="badge ${r.daysRemaining <= 3 ? 'red' : 'amber'}">${r.daysRemaining === 999 ? '∞' : r.daysRemaining + 'd'}</span></td>
+                    <td class="c-green"><b>${fmt(r.eoq)}</b></td>
+                  </tr>`).join('') : '<tr><td colspan="6"><div class="empty" style="padding:16px"><b>All stock levels healthy ✓</b></div></td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Selling Products -->
+      <div class="card">
+        <div class="card-head"><h3>🔥 Top Selling Products (30 Days)</h3></div>
+        <div class="card-body">
+          <div class="table-scroll" style="max-height:300px">
+            <table class="dt">
+              <thead><tr><th>SKU</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+              <tbody>
+                ${(() => {
+                  const skuMap = {};
+                  movements.filter(m => m.type === 'SALE' && m.date >= last30).forEach(m => {
+                    if (!skuMap[m.sku]) skuMap[m.sku] = { sku: m.sku, brand: m.brand, qty: 0, rev: 0 };
+                    skuMap[m.sku].qty += num(m.qty);
+                  });
+                  sales.filter(s => (s.date || '') >= last30).forEach(s => {
+                    (s.items || []).forEach(it => {
+                      if (!skuMap[it.sku]) skuMap[it.sku] = { sku: it.sku, brand: '', qty: 0, rev: 0 };
+                      skuMap[it.sku].rev += num(it.total || it.qty * it.price);
+                    });
+                  });
+                  return Object.values(skuMap).sort((a, b) => b.qty - a.qty).slice(0, 15).map(p => `
+                    <tr>
+                      <td><b class="mono">${esc(p.sku)}</b><span class="row-sub">${esc(p.brand || '')}</span></td>
+                      <td><b>${fmt(p.qty)}</b></td>
+                      <td>${money(p.rev)}</td>
+                    </tr>`).join('') || '<tr><td colspan="3"><div class="empty" style="padding:16px"><b>No sales in last 30 days</b></div></td></tr>';
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Repairs + Customer metrics row -->
+    <div class="grid col-3 gap-16">
+      <div class="card">
+        <div class="card-head"><h3>🛠 Repair Pipeline</h3></div>
+        <div class="card-body">
+          ${['Received', 'Diagnosed', 'In Repair', 'Waiting Parts', 'Repaired', 'Returned to Customer'].map(st => {
+            const c = repairs.filter(r => r.status === st).length;
+            return `<div class="kv-row"><span class="k">${esc(st)}</span><span class="v"><b>${fmt(c)}</b></span></div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>👥 Customer Health</h3></div>
+        <div class="card-body">
+          ${statCard({ icon: '◎', label: 'Total Customers', value: fmt(customers.length), meta: 'Registered', color: 'blue' })}
+          ${statCard({ icon: '₳', label: 'Outstanding Balance', value: money(customers.reduce((s, c) => s + num(c.balance), 0)), meta: 'Receivables', color: 'amber' })}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>🔗 Ledger Hash Status</h3></div>
+        <div class="card-body">
+          <div class="kv-row"><span class="k">Status</span><span class="v"><span class="badge ${integrityResult.valid ? 'green' : 'red'}">${integrityResult.valid ? '✓ Valid' : '✗ Corrupted'}</span></span></div>
+          <div class="kv-row"><span class="k">Records Verified</span><span class="v"><b>${fmt(integrityResult.totalRecords)}</b></span></div>
+          ${!integrityResult.valid ? `<div class="kv-row"><span class="k c-red">Corrupted at row</span><span class="v c-red"><b>#${integrityResult.corruptedIndex + 1}</b></span></div>` : ''}
+          <button class="btn sm mt-8" onclick="LedgerIntegrity.verifyChain(); renderAnalyticsEnhanced(); toast('Ledger re-verified', 'good')">Re-verify Ledger</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Patch renderAnalytics to use the enhanced version */
+const _origRenderAnalytics = typeof renderAnalytics === 'function' ? renderAnalytics : null;
+window.renderAnalytics = function() {
+  renderAnalyticsEnhanced();
+};

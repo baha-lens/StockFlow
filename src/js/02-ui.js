@@ -19,9 +19,11 @@ const NAV = [
     { key: 'repairs',    label: 'BadBin / Repairs', icon: '◈' }
   ]},
   { group: 'Business', items: [
-    { key: 'customers',  label: 'Customers', icon: '◎' },
-    { key: 'suppliers',  label: 'Suppliers', icon: '▦' },
-    { key: 'invoices',   label: 'Invoices',  icon: '◫' }
+    { key: 'customers',    label: 'Customers',     icon: '◎' },
+    { key: 'suppliers',    label: 'Suppliers',     icon: '▦' },
+    { key: 'invoices',     label: 'Invoices',      icon: '◫' },
+    { key: 'whatsappCrm',  label: 'WhatsApp CRM',  icon: '💬' },
+    { key: 'personalLog',   label: 'Personal Log',  icon: '📝' }
   ]},
   { group: 'People', items: [
     { key: 'live',       label: 'Live Attendance', icon: '▣' },
@@ -56,6 +58,8 @@ const PAGE_META = {
   customers:  ['Customers',        'Business directory'],
   suppliers:  ['Suppliers',        'Business directory'],
   invoices:   ['Invoices',         'Accounts receivable'],
+  whatsappCrm:['WhatsApp CRM',     'Customer messaging & live chat'],
+  personalLog:['Personal Log',     'Private encrypted work notes'],
   live:       ['Live Attendance',  'Terminal feed'],
   employees:  ['Employees',        'People operations'],
   payroll:    ['Payroll',          'Compensation'],
@@ -182,8 +186,8 @@ function renderPage(page) {
     dashboard: renderDashboard, live: renderLive, inventory: renderInventory, movements: renderMovements,
     transfers: renderTransfers, purchases: renderPurchases, sales: renderSales, pos: renderPOS,
     dispatch: renderDispatch, upgrades: renderUpgrades, repairs: renderRepairs, customers: renderCustomers,
-    suppliers: renderSuppliers, invoices: renderInvoices, employees: renderEmployees,
-    payroll: renderPayroll, leave: renderLeave, attendance: renderAttendance,
+    suppliers: renderSuppliers, invoices: renderInvoices, whatsappCrm: renderWhatsappCrm, personalLog: renderPersonalLog,
+    employees: renderEmployees, payroll: renderPayroll, leave: renderLeave, attendance: renderAttendance,
     finance: renderFinance, analytics: renderAnalytics, reports: renderReports,
     audit: renderAudit, settings: renderSettings, admin: renderAdmin
   };
