@@ -1,12 +1,12 @@
 {
   "name": "amaya-erp-desktop",
-  "productName": "AMAYA ERP",
+  "productName": "StockFlow ERP",
   "version": "1.0.0",
-  "description": "AMAYA ERP for Windows — warehouse, retail, after-sales, payroll and live biometric attendance.",
+  "description": "StockFlow ERP for Windows — warehouse, retail, after-sales, payroll and live biometric attendance.",
   "private": true,
   "license": "UNLICENSED",
   "author": {
-    "name": "AMAYA Industries"
+    "name": "StockFlow Team"
   },
   "type": "commonjs",
   "main": "main.js",
@@ -24,9 +24,9 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.amaya.industries.erp",
-    "productName": "AMAYA ERP",
-    "copyright": "Copyright (c) AMAYA Industries",
+    "appId": "app.stockflow.erp",
+    "productName": "StockFlow ERP",
+    "copyright": "Copyright (c) StockFlow ERP",
     "asar": false,
     "directories": {
       "output": "dist",
@@ -50,7 +50,7 @@
       "target": [
         { "target": "nsis", "arch": ["x64"] }
       ],
-      "artifactName": "AMAYA-ERP-Setup-${version}.${ext}"
+      "artifactName": "StockFlow-ERP-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -58,7 +58,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "AMAYA ERP",
+      "shortcutName": "StockFlow ERP",
       "installerLanguages": ["en_US"],
       "language": "1033"
     }

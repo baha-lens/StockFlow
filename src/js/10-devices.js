@@ -443,3 +443,154 @@ function applyShiftRules(records) {
     });
   });
 }
+
+/* ==========================================================================
+   StockFlow ERP — Thermal Printer (ESC/POS) & Barcode Scanner Engine
+   ========================================================================== */
+
+const ThermalPrinter = {
+  /**
+   * Generates ESC/POS byte array commands for 80mm / 58mm thermal printers.
+   */
+  generateEscPos(order = {}) {
+    const ESC = 0x1B, GS = 0x1D;
+    const encoder = new TextEncoder();
+    const bytes = [];
+    const add = (arr) => bytes.push(...arr);
+    const addText = (str) => add(encoder.encode(str));
+
+    // Initialize printer
+    add([ESC, 0x40]);
+    // Center alignment
+    add([ESC, 0x61, 0x01]);
+    // Double height + width for Header
+    add([ESC, 0x21, 0x30]);
+    addText(`${(state.db.settings.companyName || 'StockFlow ERP').toUpperCase()}\n`);
+    add([ESC, 0x21, 0x00]); // Reset font
+    addText(`${state.db.settings.companyTagline || 'Warehouse & Retail System'}\n`);
+    addText(`Tel: ${state.db.settings.companyPhone || 'N/A'}\n`);
+    addText('------------------------------------------------\n');
+
+    // Left alignment for Details
+    add([ESC, 0x61, 0x00]);
+    addText(`Invoice #: ${order.orderId || order.trxRef || 'INV-0001'}\n`);
+    addText(`Date:      ${order.date || new Date().toISOString().slice(0, 10)}\n`);
+    addText(`Customer:  ${order.customerName || 'Walk-in Customer'}\n`);
+    addText(`Cashier:   ${order.user || 'Admin'}\n`);
+    addText('------------------------------------------------\n');
+
+    // Item Table
+    addText('ITEM                     QTY    PRICE     TOTAL\n');
+    addText('------------------------------------------------\n');
+    (order.items || []).forEach(it => {
+      const name = String(it.name || it.sku || 'Item').padEnd(24, ' ').slice(0, 24);
+      const qty = String(it.qty || 1).padStart(4, ' ');
+      const price = String(num(it.price || it.unitPrice)).padStart(8, ' ');
+      const total = String(num(it.total || (it.qty * it.price))).padStart(9, ' ');
+      addText(`${name}${qty}${price}${total}\n`);
+    });
+    addText('------------------------------------------------\n');
+
+    // Totals Right Aligned
+    add([ESC, 0x61, 0x02]);
+    addText(`Subtotal: ${num(order.subtotal || order.totalAmount || 0).toFixed(2)}\n`);
+    if (order.discount) addText(`Discount: -${num(order.discount).toFixed(2)}\n`);
+    if (order.tax) addText(`Tax/VAT: +${num(order.tax).toFixed(2)}\n`);
+    add([ESC, 0x21, 0x20]); // Bold text
+    addText(`TOTAL: ${num(order.netAmount || order.totalAmount || 0).toFixed(2)}\n`);
+    add([ESC, 0x21, 0x00]);
+    addText('------------------------------------------------\n');
+
+    // Footer Center Aligned
+    add([ESC, 0x61, 0x01]);
+    addText('Thank you for your business!\n');
+    addText('Powered by StockFlow ERP\n\n\n');
+
+    // Cut Paper Command
+    add([GS, 0x56, 0x42, 0x00]);
+    return new Uint8Array(bytes);
+  },
+
+  /**
+   * Send print job via WebUSB or silent window print fallback.
+   */
+  async printReceipt(order) {
+    if ('usb' in navigator) {
+      try {
+        const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x04b8 /* Epson */ }] });
+        await device.open();
+        await device.selectConfiguration(1);
+        await device.claimInterface(0);
+        const rawData = this.generateEscPos(order);
+        await device.transferOut(1, rawData);
+        await device.close();
+        toast('Receipt printed directly to USB Thermal Printer!', 'good');
+        return true;
+      } catch (e) {
+        console.warn('USB Direct Print failed or cancelled, falling back to browser print:', e);
+      }
+    }
+    // Fallback silent print
+    window.print();
+    return true;
+  }
+};
+
+const BarcodeScannerEngine = {
+  buffer: '',
+  lastTime: 0,
+  thresholdMs: 40,
+  listening: false,
+
+  init() {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener('keydown', (e) => {
+      const target = e.target;
+      // Ignore textareas or active contenteditables unless specially marked
+      if (target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      const now = performance.now();
+      const delta = now - this.lastTime;
+      this.lastTime = now;
+
+      if (e.key === 'Enter') {
+        if (this.buffer.length >= 3) {
+          const barcode = this.buffer.trim();
+          this.buffer = '';
+          this.onScan(barcode, target);
+        } else {
+          this.buffer = '';
+        }
+        return;
+      }
+
+      if (e.key.length === 1) {
+        if (delta > this.thresholdMs) {
+          this.buffer = e.key; // Reset if typing slowly (human speed)
+        } else {
+          this.buffer += e.key; // Fast barcode scanner input burst
+        }
+      }
+    });
+  },
+
+  onScan(barcode, targetElement) {
+    console.log('[BarcodeScannerEngine] Scanned:', barcode);
+    toast(`Barcode Scanned: ${barcode}`, 'good');
+    window.dispatchEvent(new CustomEvent('stockflow:barcode-scanned', { detail: { barcode, targetElement } }));
+
+    // Auto-fill active input if focused on an input element
+    if (targetElement && targetElement.tagName === 'INPUT') {
+      targetElement.value = barcode;
+      targetElement.dispatchEvent(new Event('input', { bubbles: true }));
+      targetElement.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+};
+
+// Initialize barcode listener automatically on boot
+if (typeof window !== 'undefined') {
+  BarcodeScannerEngine.init();
+}
+
