@@ -27,3 +27,7 @@ apps/android/.flutter-plugins-dependencies
 *.apk
 *.aab
 *.appbundle
+dist/
+desktop/dist/
+*.exe
+

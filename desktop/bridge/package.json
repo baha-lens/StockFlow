@@ -1,0 +1,15 @@
+{
+  "name": "amaya-attendance-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZKTeco K40 / K50i attendance bridge for AMAYA ERP. Zero dependencies.",
+  "type": "commonjs",
+  "main": "bridge.js",
+  "bin": { "amaya-bridge": "bridge.js" },
+  "scripts": {
+    "start": "node bridge.js",
+    "diagnose": "node bridge.js --diagnose"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {}
+}

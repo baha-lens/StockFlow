@@ -1,0 +1,66 @@
+{
+  "name": "amaya-erp-desktop",
+  "productName": "AMAYA ERP",
+  "version": "1.0.0",
+  "description": "AMAYA ERP for Windows — warehouse, retail, after-sales, payroll and live biometric attendance.",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": {
+    "name": "AMAYA Industries"
+  },
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node make-icon.js",
+    "stage": "node stage.js",
+    "check": "node check-dom.cjs && node check-ipc.cjs && node stage.js --check",
+    "pack": "npm run stage && electron-builder --win --dir",
+    "dist": "npm run stage && electron-builder --win nsis"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.amaya.industries.erp",
+    "productName": "AMAYA ERP",
+    "copyright": "Copyright (c) AMAYA Industries",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "windows/**/*",
+      "assets/**/*",
+      "app/**/*",
+      "bridge/**/*",
+      "!windows/_harness.html",
+      "!**/*.map"
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "artifactName": "AMAYA-ERP-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AMAYA ERP",
+      "installerLanguages": ["en_US"],
+      "language": "1033"
+    }
+  }
+}

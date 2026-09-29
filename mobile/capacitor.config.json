@@ -1,0 +1,13 @@
+{
+  "appId": "com.amaya.industries.erp",
+  "appName": "AMAYA ERP",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#ffffff"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {}
+}

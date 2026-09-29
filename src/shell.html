@@ -1,0 +1,870 @@
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen" class="hidden">
+  <div class="login-shell">
+    <aside class="login-aside">
+      <div class="row">
+        <div data-brand-slot="login" class="brand-slot"></div>
+        <div>
+          <div style="font-weight:800;font-size:16px;letter-spacing:-.03em;">AMAYA ERP</div>
+          <div style="font-size:10px;color:rgba(244,243,239,.5);text-transform:uppercase;letter-spacing:.14em;font-weight:800;">Unified Distribution Suite</div>
+        </div>
+      </div>
+      <h1>One console for<br><em>every</em> warehouse operation.</h1>
+      <p>Stock ledger, transfers, retail POS, after-sales repairs, purchasing, dispatch, HR and finance — unified, auditable and offline-capable.</p>
+      <div class="login-feats" id="loginFeats"></div>
+      <div class="login-stats" id="loginStats"></div>
+    </aside>
+    <section class="login-form-side">
+      <h2>Sign in</h2>
+      <p>Authenticate with your staff credentials to open the console.</p>
+      <form class="login-fields" id="loginForm" autocomplete="on">
+        <div class="field">
+          <label for="loginEmail">Email address</label>
+          <input class="input" id="loginEmail" type="email" placeholder="you@amaya.com" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input class="input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <div id="loginError"></div>
+        <button class="btn primary lg block" type="submit" id="loginBtn">Sign in to dashboard</button>
+      </form>
+      <!-- Pre-filled demo credentials. renderLoginScreen() empties this wrapper
+           the moment a real superadmin exists, so the seeded admin@amaya.com /
+           admin pair is a first-run convenience and never a standing backdoor. -->
+      <div id="quickUsersWrap">
+        <div class="quick-users" id="quickUsers"></div>
+        <div class="login-hint" id="demoHint">
+          <b>Demo access</b> — every seeded account below signs in with the password
+          <span class="mono">admin</span>. They exist so you can see what each role is
+          allowed to do. They are removed for good as soon as you create your own
+          superadmin account.
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL ===================== -->
+<div id="appShell" class="hidden">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div data-brand-slot="side" class="brand-slot"></div>
+      <div>
+        <div class="brand-name">AMAYA ERP</div>
+        <div class="brand-sub">Distribution Suite</div>
+      </div>
+    </div>
+    <div class="nav-scroll scroll-y" id="navScroll"></div>
+    <div class="sidebar-foot">
+      <button class="sync-chip hidden" id="bridgeChip" title="Biometric terminal bridge — click to open the live view">
+        <span class="sync-dot"></span>
+        <span id="bridgeText" class="grow" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">No bridge</span>
+        <span class="gi" style="font-size:11px;opacity:.6;">▣</span>
+      </button>
+      <button class="sync-chip" id="syncChip" title="Click to synchronise with the configured backend">
+        <span class="sync-dot"></span>
+        <span id="syncText" class="grow" style="text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Local mode</span>
+        <span class="gi" style="font-size:11px;opacity:.6;">⟳</span>
+      </button>
+      <button class="user-pill" id="userPill" title="Account &amp; session">
+        <div class="avatar" id="sideAvatar">A</div>
+        <div class="user-meta">
+          <b id="sideUserName">Admin</b>
+          <small id="sideUserRole">Administrator</small>
+        </div>
+        <span class="gi" style="color:var(--text-3);font-size:12px;">⚙</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn hamburger" id="hamburger" aria-label="Toggle navigation">☰</button>
+      <button class="icon-btn back-btn hidden" id="backBtn" aria-label="Go back" title="Back - hold for the dashboard">‹</button>
+      <div class="top-title">
+        <h1 id="topTitle">Dashboard</h1>
+        <small id="topSub">Central operations</small>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn home-btn hidden" id="homeBtn" aria-label="Dashboard" title="Dashboard">⌂</button>
+        <div class="omni" id="omniWrap">
+          <span class="gi">⌕</span>
+          <input id="omniInput" placeholder="Search anything — SKU, IMEI, invoice, customer…" aria-label="Global search" autocomplete="off">
+          <kbd>/</kbd>
+          <div class="omni-results hidden" id="omniResults"></div>
+        </div>
+        <button class="icon-btn" id="scanBtn" title="Barcode / QR scanner">▣</button>
+        <button class="icon-btn" id="themeBtn" title="Toggle light / dark theme">☀</button>
+        <button class="icon-btn" id="notifyBtn" title="Alerts &amp; notifications">🔔<span id="notifyDot" class="hidden" style="position:absolute;margin:-14px 0 0 12px;width:7px;height:7px;border-radius:50%;background:var(--red);"></span></button>
+        <button class="btn primary sm" id="quickAddBtn">＋ <span class="hide-xs">New</span></button>
+      </div>
+    </header>
+
+    <div class="content scroll-y" id="content">
+      <div id="bannerHost"></div>
+
+      <!-- ============ DASHBOARD ============ -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Executive summary</div>
+            <h2>Operations Command Centre</h2>
+            <p id="dashSubtitle">Real-time consolidated figures across every warehouse facility, retail counter and service lab.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" data-goto="reports">▤ Reports</button>
+            <button class="btn primary" data-quick="movement">⇄ Record movement</button>
+          </div>
+        </div>
+        <div class="quick-grid" id="dashQuick"></div>
+        <div class="stats" id="dashStats"></div>
+        <section class="card panel mom-panel">
+          <div class="panel-head">
+            <div class="panel-title"><span class="gi">◎</span>Your momentum<small>Computed from records already in this database — nothing is uploaded anywhere</small></div>
+            <span class="badge" id="momStreak">0</span>
+          </div>
+          <div id="dashMomentum"></div>
+        </section>
+        <div class="grid g-115">
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">▤</span>Revenue &amp; dispatch trend<small>Last 7 days across sales and dispatches</small></div>
+              <div class="seg" id="dashTrendSeg">
+                <button data-days="7" class="on">7D</button>
+                <button data-days="30">30D</button>
+              </div>
+            </div>
+            <div id="dashChart"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">⚑</span>Critical alerts<small>Items that need a decision today</small></div>
+              <span class="badge amber" id="alertCount">0</span>
+            </div>
+            <div class="alert-list" id="dashAlerts"></div>
+          </section>
+        </div>
+        <div class="grid g-211">
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">▣</span>Stock by facility<small>Units held per location</small></div>
+            </div>
+            <div id="dashFacilities"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">◔</span>Activity feed<small>Latest actions across the business</small></div>
+              <button class="btn sm ghost" data-goto="audit">Full audit →</button>
+            </div>
+            <div class="scroll-y" style="max-height:320px" id="dashFeed"></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">◫</span>Stock composition<small>Units by stock category</small></div>
+            </div>
+            <div id="dashDonut"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">▣</span>Brand distribution<small>Live available units</small></div>
+            </div>
+            <div id="dashBrands"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ INVENTORY ============ -->
+      <section class="page" id="page-inventory">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Central register</div>
+            <h2>Master Stock Inventory</h2>
+            <p>Balance = opening + received − issued + transfer in − transfer out + returned − sold ± adjustments.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnReconcile">⚖ Reconcile</button>
+            <button class="btn" id="btnExportInv">↓ CSV</button>
+            <button class="btn primary" id="btnAddItem">＋ New item</button>
+          </div>
+        </div>
+        <div class="stats" id="invStats"></div>
+        <div class="toolbar">
+          <div class="search-field">
+            <span class="gi">⌕</span>
+            <input class="input" id="invSearch" placeholder="Search model, SKU, brand, colour, IMEI…">
+          </div>
+          <select class="select" id="invType"><option value="">All categories</option></select>
+          <select class="select" id="invBrand"><option value="">All brands</option></select>
+          <select class="select" id="invHouse"><option value="">All facilities</option></select>
+          <select class="select" id="invStatus">
+            <option value="">All levels</option>
+            <option value="healthy">Healthy (&gt; 20)</option>
+            <option value="low">Low (1–20)</option>
+            <option value="critical">Critical (1–5)</option>
+            <option value="out">Out of stock</option>
+          </select>
+          <div class="toolbar-right">
+            <span class="toolbar-count" id="invCount"></span>
+            <div class="seg" id="invViewSeg">
+              <button data-view="lines" class="on">Stock lines</button>
+              <button data-view="items">Catalogue</button>
+            </div>
+          </div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="invTable"></div><div class="table-foot" id="invFoot"></div></div>
+      </section>
+
+      <!-- ============ MOVEMENTS ============ -->
+      <section class="page" id="page-movements">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Controlled ledger entry</div>
+            <h2>Stock Movement</h2>
+            <p>Every movement writes an auditable transaction reference and updates the available balance immediately.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportMv">↓ CSV</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="mvSearch" placeholder="Search reference, item, user or note…"></div>
+          <select class="select" id="mvType"><option value="">All types</option></select>
+          <select class="select" id="mvHouse"><option value="">All facilities</option></select>
+          <select class="select" id="mvDays">
+            <option value="">All time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+          <div class="toolbar-right"><span class="toolbar-count" id="mvCount"></span></div>
+        </div>
+        <div class="grid side">
+          <div class="table-card"><div class="table-scroll" id="mvTable"></div><div class="table-foot" id="mvFoot"></div></div>
+          <aside class="card panel" id="mvSummary"></aside>
+        </div>
+      </section>
+
+      <!-- ============ TRANSFERS ============ -->
+      <section class="page" id="page-transfers">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Multi-stage workflow</div>
+            <h2>Warehouse Transfers</h2>
+            <p>Lifecycle: Pending → Approved → Dispatched → In transit → Received → Complete, with a printable gate pass at every stage.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn primary" id="btnNewTransfer">＋ New transfer</button>
+          </div>
+        </div>
+        <div class="tabs" id="trfTabs"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="trfSearch" placeholder="Search ref, facility, carrier or requester…"></div>
+          <div class="toolbar-right"><span class="toolbar-count" id="trfCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="trfTable"></div><div class="table-foot" id="trfFoot"></div></div>
+      </section>
+
+      <!-- ============ PURCHASES ============ -->
+      <section class="page" id="page-purchases">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Procurement</div>
+            <h2>Purchase Orders</h2>
+            <p>Raise supplier POs, track expected arrivals and receive stock directly into a facility.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportPO">↓ CSV</button>
+            <button class="btn primary" id="btnNewPO">＋ New purchase order</button>
+          </div>
+        </div>
+        <div class="stats" id="poStats"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="poSearch" placeholder="Search PO, supplier or item…"></div>
+          <select class="select" id="poStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="poCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="poTable"></div><div class="table-foot" id="poFoot"></div></div>
+      </section>
+
+      <!-- ============ SALES ============ -->
+      <section class="page" id="page-sales">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Order management</div>
+            <h2>Sales Orders</h2>
+            <p>Every sale deducts sold units from the warehouse ledger and issues a numbered tax invoice.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportSales">↓ CSV</button>
+            <button class="btn primary" id="btnNewSale">＋ New sale</button>
+          </div>
+        </div>
+        <div class="stats" id="saleStats"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="saleSearch" placeholder="Search order, invoice or customer…"></div>
+          <select class="select" id="saleStatus"><option value="">All statuses</option></select>
+          <select class="select" id="salePay"><option value="">All payment modes</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="saleCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="saleTable"></div><div class="table-foot" id="saleFoot"></div></div>
+      </section>
+
+      <!-- ============ POS ============ -->
+      <section class="page" id="page-pos">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Point of sale</div>
+            <h2>Retail Counter Checkout</h2>
+            <p>Pick sellable stock, capture payment and print a compliant invoice in seconds.</p>
+          </div>
+        </div>
+        <div class="grid side">
+          <div>
+            <div class="toolbar">
+              <div class="search-field"><span class="gi">⌕</span><input class="input" id="posSearch" placeholder="Search sellable stock…"></div>
+              <select class="select" id="posBrand"><option value="">All brands</option></select>
+              <select class="select" id="posHouse"><option value="">All facilities</option></select>
+            </div>
+            <div class="grid g-4" id="posGrid" style="gap:12px"></div>
+          </div>
+          <aside class="card panel" id="posCart"></aside>
+        </div>
+      </section>
+
+      <!-- ============ DISPATCH ============ -->
+      <section class="page" id="page-dispatch">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Logistics</div>
+            <h2>Dispatch &amp; Delivery</h2>
+            <p>Pack, hand to courier and track every outbound consignment to handover.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportDsp">↓ CSV</button>
+            <button class="btn primary" id="btnNewDispatch">＋ New dispatch</button>
+          </div>
+        </div>
+        <div class="stats" id="dspStats"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="dspSearch" placeholder="Search dispatch, tracking or customer…"></div>
+          <select class="select" id="dspStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="dspCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="dspTable"></div><div class="table-foot" id="dspFoot"></div></div>
+      </section>
+
+      <!-- ============ AFTER-SALES / BADBIN ============ -->
+      <!-- ============ TRADE-IN DESK ============ -->
+      <section class="page" id="page-upgrades">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Customer exchange</div>
+            <h2>Trade-in &amp; Upgrade Desk</h2>
+            <p>Value the customer's old device, take the credit off the new one, and book the incoming unit into stock honestly - showing the margin the trade actually retains, not the margin it appears to.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportUpg">⭳ CSV</button>
+            <button class="btn primary" id="btnNewTrade">+ New trade-in</button>
+          </div>
+        </div>
+        <div class="stats" id="upgStats"></div>
+        <div class="toolbar" id="upgToolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="upgSearch" placeholder="Search reference, customer, model or IMEI."></div>
+          <select class="select" id="upgStage">
+            <option value="">All stages</option>
+            <option>Valued</option><option>Agreed</option><option>Issued</option>
+            <option>Received</option><option>Closed</option><option>Cancelled</option>
+          </select>
+          <select class="select" id="upgSeries"><option value="">All brands</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="upgCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="upgTable"></div><div class="table-foot" id="upgFoot"></div></div>
+      </section>
+
+      <section class="page" id="page-repairs">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">After-sales intelligence</div>
+            <h2>BadBin &amp; Repair Operations</h2>
+            <p>Warranty intake, defect triage, technician assignment and GoodBin recoveries — with full IMEI traceability.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportRep">↓ CSV</button>
+            <button class="btn primary" id="btnNewRepair">＋ New repair ticket</button>
+          </div>
+        </div>
+        <div class="stats" id="repStats"></div>
+        <div class="tabs" id="repTabs">
+          <button data-tab="tickets" class="on">Repair tickets <span class="tab-n" id="tnTickets">0</span></button>
+          <button data-tab="imei">IMEI registry <span class="tab-n" id="tnImei">0</span></button>
+          <button data-tab="warranty">Warranty claims <span class="tab-n" id="tnWarranty">0</span></button>
+        </div>
+        <div class="toolbar" id="repToolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="repSearch" placeholder="Search ticket, IMEI, model or technician…"></div>
+          <select class="select" id="repStatus"><option value="">All statuses</option></select>
+          <select class="select" id="repDefect"><option value="">All defect categories</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="repCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="repTable"></div><div class="table-foot" id="repFoot"></div></div>
+      </section>
+
+      <!-- ============ CUSTOMERS ============ -->
+      <section class="page" id="page-customers">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Business directory</div>
+            <h2>Customers</h2>
+            <p>Retail walk-ins, corporate accounts and credit-limited trade partners.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportCust">↓ CSV</button>
+            <button class="btn primary" id="btnNewCustomer">＋ New customer</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="custSearch" placeholder="Search name, phone, city or email…"></div>
+          <select class="select" id="custStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="custCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="custTable"></div><div class="table-foot" id="custFoot"></div></div>
+      </section>
+
+      <!-- ============ SUPPLIERS ============ -->
+      <section class="page" id="page-suppliers">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Business directory</div>
+            <h2>Suppliers</h2>
+            <p>Distributors and manufacturers with account, terms and payable balances.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportSupp">↓ CSV</button>
+            <button class="btn primary" id="btnNewSupplier">＋ New supplier</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="suppSearch" placeholder="Search name, city, account or email…"></div>
+          <select class="select" id="suppStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="suppCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="suppTable"></div><div class="table-foot" id="suppFoot"></div></div>
+      </section>
+
+      <!-- ============ INVOICES ============ -->
+      <section class="page" id="page-invoices">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Accounts receivable</div>
+            <h2>Invoices</h2>
+            <p>Tax invoices for sales, purchase bills and service charges, with payment tracking.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportInv2">↓ CSV</button>
+            <button class="btn primary" id="btnNewInvoice">＋ New invoice</button>
+          </div>
+        </div>
+        <div class="stats" id="invStats2"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="invcSearch" placeholder="Search invoice or party…"></div>
+          <select class="select" id="invcType"><option value="">All types</option></select>
+          <select class="select" id="invcStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="invcCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="invcTable"></div><div class="table-foot" id="invcFoot"></div></div>
+      </section>
+
+      <!-- ============ EMPLOYEES ============ -->
+      <section class="page" id="page-employees">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">People operations</div>
+            <h2>Employees</h2>
+            <p>Staff directory with department, designation, facility and payroll linkage.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportEmp">↓ CSV</button>
+            <button class="btn primary" id="btnNewEmployee">＋ New employee</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="empSearch" placeholder="Search name, code, department or role…"></div>
+          <select class="select" id="empDept"><option value="">All departments</option></select>
+          <select class="select" id="empStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="empCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="empTable"></div><div class="table-foot" id="empFoot"></div></div>
+      </section>
+
+      <!-- ============ PAYROLL ============ -->
+      <section class="page" id="page-payroll">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Compensation</div>
+            <h2>Payroll</h2>
+            <p>Monthly payslips with overtime, bonus and deduction calculations.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportPay">↓ CSV</button>
+            <button class="btn primary" id="btnRunPayroll">▶ Run payroll</button>
+          </div>
+        </div>
+        <div class="stats" id="payStats"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="paySearch" placeholder="Search employee or month…"></div>
+          <select class="select" id="payMonth"><option value="">All months</option></select>
+          <select class="select" id="payStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="payCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="payTable"></div><div class="table-foot" id="payFoot"></div></div>
+      </section>
+
+      <!-- ============ LEAVE ============ -->
+      <section class="page" id="page-leave">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Time off</div>
+            <h2>Leave Requests</h2>
+            <p>Submit, approve and track staff leave with automatic day counting.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn primary" id="btnNewLeave">＋ Request leave</button>
+          </div>
+        </div>
+        <div class="stats" id="leaveStats"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="leaveSearch" placeholder="Search employee or leave type…"></div>
+          <select class="select" id="leaveStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="leaveCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="leaveTable"></div><div class="table-foot" id="leaveFoot"></div></div>
+      </section>
+
+      <!-- ============ LIVE ATTENDANCE ============ -->
+      <section class="page" id="page-live">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Terminal feed</div>
+            <h2>Live Attendance</h2>
+            <p>Read straight from the ZKTeco terminals through the local bridge. Refreshes automatically.</p>
+          </div>
+          <div class="page-actions">
+            <select class="select" id="liveDate" style="min-width:150px"></select>
+            <button class="btn" id="btnLiveRefresh">⟳ Refresh</button>
+            <button class="btn" id="btnCopyLive">⧉ Copy live link</button>
+            <button class="btn" id="btnForcePoll">⇄ Poll terminals now</button>
+          </div>
+        </div>
+        <div id="liveBridgeBanner"></div>
+        <div class="stats" id="liveStats"></div>
+        <div class="grid side">
+          <div class="table-card">
+            <div class="panel-head" style="padding:14px 16px 0;margin-bottom:8px">
+              <div class="panel-title"><span class="gi">✓</span>Today's board<small id="liveBoardSub"></small></div>
+              <div class="seg" id="liveFilterSeg">
+                <button data-lf="all" class="on">Everyone</button>
+                <button data-lf="flag">Needs attention</button>
+                <button data-lf="unmapped">Unmapped</button>
+              </div>
+            </div>
+            <div class="table-scroll" id="liveBoard"></div>
+            <div class="table-foot" id="liveFoot"></div>
+          </div>
+          <div class="col" style="gap:16px">
+            <section class="card panel">
+              <div class="panel-head"><div class="panel-title"><span class="gi">▣</span>Terminals<small>Status from the bridge</small></div></div>
+              <div id="liveDevices"></div>
+            </section>
+            <section class="card panel">
+              <div class="panel-head"><div class="panel-title"><span class="gi">◔</span>Punch feed<small id="liveFeedSub">Newest first</small></div></div>
+              <div class="scroll-y" style="max-height:340px" id="liveFeed"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ATTENDANCE ============ -->
+      <section class="page" id="page-attendance">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Time &amp; attendance</div>
+            <h2>Attendance Register</h2>
+            <p>Punches from the biometric terminals arrive automatically. Manual entries and CSV imports sit alongside them.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" data-goto="live">▣ Live view</button>
+            <button class="btn" id="btnExportAtt">↓ CSV</button>
+            <button class="btn" id="btnImportAtt">⇪ Import device log</button>
+            <button class="btn primary" id="btnNewAtt">＋ Manual punch</button>
+          </div>
+        </div>
+        <div class="stats" id="attStats"></div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="attSearch" placeholder="Search employee or device…"></div>
+          <select class="select" id="attDate"><option value="">All dates</option></select>
+          <select class="select" id="attStatus"><option value="">All statuses</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="attCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="attTable"></div><div class="table-foot" id="attFoot"></div></div>
+      </section>
+
+      <!-- ============ FINANCE ============ -->
+      <section class="page" id="page-finance">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Money in, money out</div>
+            <h2>Finance</h2>
+            <p>Cash position, receivables, payables and gross margin derived from the live ledger.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportFin">↓ CSV</button>
+          </div>
+        </div>
+        <div class="stats" id="finStats"></div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◍</span>Cash flow by month<small>Sales inflow vs supplier outflow</small></div></div>
+            <div id="finChart"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◔</span>Ledger entries<small>Most recent financial documents</small></div></div>
+            <div class="scroll-y" style="max-height:340px" id="finLedger"></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">▲</span>Receivables ageing<small>Outstanding by bucket</small></div></div>
+            <div id="finAgeing"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">▼</span>Top suppliers by payable<small>Amount owed</small></div></div>
+            <div id="finSuppliers"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ ANALYTICS ============ -->
+      <section class="page" id="page-analytics">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Deep metrics</div>
+            <h2>Advanced Analytics</h2>
+            <p>Velocity, margin, concentration and workforce metrics computed from the full transaction history.</p>
+          </div>
+        </div>
+        <div class="stats" id="anaStats"></div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">★</span>Top performing items<small>By revenue contribution</small></div></div>
+            <div class="table-scroll" id="anaTop"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◴</span>Slow moving stock<small>Held longest relative to peers</small></div></div>
+            <div class="table-scroll" id="anaSlow"></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◫</span>Warehouse efficiency<small>Issue rate by facility</small></div></div>
+            <div id="anaFac"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◉</span>Service performance<small>Repair turnaround by category</small></div></div>
+            <div id="anaService"></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◎</span>Customer concentration<small>Share of revenue</small></div></div>
+            <div id="anaCust"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◷</span>Workforce analytics<small>Headcount, attendance and leave load</small></div></div>
+            <div id="anaHr"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ REPORTS ============ -->
+      <section class="page" id="page-reports">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Consolidated intelligence</div>
+            <h2>Reports</h2>
+            <p>Audit-grade stock valuations, movement summaries and printable report packs.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnPrintReport">🖨 Print report</button>
+            <button class="btn primary" id="btnReportExport">↓ Download full report (CSV)</button>
+          </div>
+        </div>
+        <div class="stats" id="repStats"></div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◫</span>Stock valuation by facility<small>Units × unit cost</small></div></div>
+            <div class="table-scroll" id="repLocation"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◑</span>Category separation<small>Regular / LMP / Refurbished / Repair</small></div></div>
+            <div id="repType"></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">⇄</span>Movement summary<small>Ledger activity by direction</small></div></div>
+            <div id="repMovement"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◫</span>Report pack<small>One-click printable documents</small></div></div>
+            <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px" id="repPack"></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◔</span>Sales performance by customer<small>Top accounts</small></div></div>
+            <div id="repCustomers"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">⚑</span>Data quality register<small>Integrity checks on live data</small></div></div>
+            <div id="repQuality"></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ AUDIT ============ -->
+      <section class="page" id="page-audit">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Accountability trail</div>
+            <h2>Audit Log</h2>
+            <p>Every creation, movement, transfer, adjustment, approval and deletion is permanently recorded with its actor.</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn" id="btnExportAudit">↓ CSV</button>
+            <button class="btn danger" id="btnClearAudit" data-requires-admin>Clear log</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="search-field"><span class="gi">⌕</span><input class="input" id="auditSearch" placeholder="Search user, action, module or reference…"></div>
+          <select class="select" id="auditModule"><option value="">All modules</option></select>
+          <select class="select" id="auditAction"><option value="">All actions</option></select>
+          <div class="toolbar-right"><span class="toolbar-count" id="auditCount"></span></div>
+        </div>
+        <div class="table-card"><div class="table-scroll" id="auditTable"></div><div class="table-foot" id="auditFoot"></div></div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="page" id="page-settings">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Infrastructure &amp; preferences</div>
+            <h2>System Settings</h2>
+            <p>Connect an external backend, manage facilities, tune thresholds and maintain your data.</p>
+          </div>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◈</span>Backend connection<small>Works offline by default</small></div><span class="badge green" id="backendMode">Local</span></div>
+            <div id="backendPanel"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">▣</span>Biometric terminals<small>ZKTeco K40 / K50i via the local bridge</small></div>
+              <span class="badge grey" id="bridgeBadge">Not connected</span>
+            </div>
+            <div id="bridgePanel"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◫</span>Company profile<small>Used on printed documents</small></div></div>
+            <div class="form-grid">
+              <div class="field span-2"><label>Company name</label><input class="input" id="setCompany"></div>
+              <div class="field span-2"><label>Address</label><input class="input" id="setAddress"></div>
+              <div class="field"><label>Phone</label><input class="input" id="setPhone"></div>
+              <div class="field"><label>Email</label><input class="input" id="setEmail"></div>
+              <div class="field"><label>Tax / Trade licence no.</label><input class="input" id="setTax"></div>
+              <div class="field"><label>Currency symbol</label><input class="input" id="setCurrency" maxlength="4"></div>
+              <div class="field"><label>Low-stock threshold</label><input class="input" id="setThreshold" type="number" min="0"></div>
+              <div class="field"><label>Shift start (late after)</label><input class="input" id="setShift" type="time"></div>
+              <div class="field span-2"><label>Invoice footer note</label><input class="input" id="setFooter"></div>
+            </div>
+            <div class="row mt-16"><button class="btn primary" id="btnSaveSettings">Save settings</button></div>
+          </section>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head">
+              <div class="panel-title"><span class="gi">◉</span>Facilities<small id="locCount">0 locations</small></div>
+              <button class="btn sm" id="btnAddLocation">＋ Add</button>
+            </div>
+            <div id="locList"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">▤</span>Data maintenance<small>Backup, restore and bulk import</small></div></div>
+            <div class="grid" style="grid-template-columns:1fr 1fr;gap:9px" id="maintPanel"></div>
+            <div class="mt-16">
+              <div class="section-title">Bulk CSV import</div>
+              <div class="row-wrap mb-8">
+                <select class="select" id="bulkEntity" style="flex:1;min-width:150px"></select>
+                <input class="input" id="bulkFile" type="file" accept=".csv,text/csv" style="flex:1;min-width:150px">
+              </div>
+              <div class="row-wrap">
+                <button class="btn" id="btnBulkImport">Import CSV</button>
+                <button class="btn ghost" id="btnBulkTemplate">⭳ Download template</button>
+              </div>
+              <div class="form-hint mt-8" id="bulkHint">Column headers must match the entity fields shown in the template.</div>
+            </div>
+          </section>
+        </div>
+        <section class="card panel">
+          <div class="panel-head"><div class="panel-title"><span class="gi">⚙</span>Application preferences</div></div>
+          <div class="grid g-3" id="prefPanel"></div>
+        </section>
+      </section>
+
+      <!-- ============ ADMIN ============ -->
+      <section class="page" id="page-admin">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Restricted workspace</div>
+            <h2>Administrator Control</h2>
+            <p>Manage staff access, roles, PINs and assign operational work in bulk.</p>
+          </div>
+        </div>
+        <div class="grid g-2">
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">◉</span>User management<small id="adminUserCount">0 accounts</small></div><button class="btn sm primary" id="btnAdminNewUser">＋ New user</button></div>
+            <div class="table-scroll" id="adminUsers"></div>
+          </section>
+          <section class="card panel">
+            <div class="panel-head"><div class="panel-title"><span class="gi">☑</span>Task assignment<small>Assign operational work in bulk</small></div></div>
+            <div class="form-grid">
+              <div class="field"><label>Assignee</label><select class="select" id="taskAssignee"></select></div>
+              <div class="field"><label>Due date</label><input class="input" id="taskDue" type="date"></div>
+              <div class="field span-2"><label>Tasks (one per line)</label><textarea class="input" id="taskLines" placeholder="Count Main House retail stock&#10;Review 4 pending transfers&#10;Prepare repair intake for HONOR batch"></textarea></div>
+            </div>
+            <div class="row mt-12"><button class="btn primary" id="btnAddTasks">Assign tasks</button></div>
+            <div class="mt-16" id="adminTasks"></div>
+          </section>
+        </div>
+        <section class="card panel">
+          <div class="panel-head"><div class="panel-title"><span class="gi">◑</span>Access control matrix<small>What each role may do</small></div></div>
+          <div class="table-scroll" id="roleMatrix"></div>
+        </section>
+      </section>
+    </div>
+
+    <!-- Mobile bottom nav -->
+    <nav class="mobile-nav" id="mobileNav"></nav>
+  </div>
+</div>
+
+<div id="modalHost"></div>
+<div id="drawerHost"></div>
+<div id="toastHost"></div>
+<!-- Confetti is appended here by Momentum.celebrate(). pointer-events:none and
+     a fixed full-viewport box, so a celebration can never swallow a tap. -->
+<div id="confettiHost" aria-hidden="true"></div>

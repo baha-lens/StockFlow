@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AMAYA ERP — Setup</title>
+<link rel="stylesheet" href="setup.css">
+</head>
+<body>
+
+<header class="bar">
+  <img src="../assets/icon.png" alt="" width="26" height="26">
+  <div>
+    <b>AMAYA ERP</b>
+    <small id="barSub">Setup</small>
+  </div>
+  <div class="grow"></div>
+  <div class="steps" id="steps">
+    <span data-step="1" class="on">Machine</span>
+    <span data-step="2">Terminals</span>
+    <span data-step="3">Remote</span>
+  </div>
+</header>
+
+<main id="view">
+  <!-- ================= MACHINE ================= -->
+  <section class="page on" id="pg1">
+    <h1>Set up this machine</h1>
+    <p class="lede">AMAYA ERP runs on this computer and serves the app and your attendance terminals over your local network.</p>
+
+    <div class="card">
+      <h2>Local address</h2>
+      <div class="row">
+        <label class="sw"><input type="checkbox" id="lanOnly" checked><span></span>
+          <div><b>Reachable on this network</b>
+          <small>Other devices and phones on your Wi-Fi can open the app. Turn this off to keep it on this computer only.</small></div>
+        </label>
+      </div>
+      <div class="grid2">
+        <label class="fld"><span>Port</span>
+          <input class="inp" id="port" type="number" min="1024" max="65535" value="8787">
+          <small>Change this only if another program already uses 8787.</small>
+        </label>
+        <label class="fld"><span>This machine's address</span>
+          <input class="inp" id="addr" readonly>
+          <small>What other devices on your network will use.</small>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Start with Windows</h2>
+      <div class="row">
+        <label class="sw"><input type="checkbox" id="startWin"><span></span>
+          <div><b>Start automatically</b>
+          <small>Attendance keeps syncing even when nobody opens the app. Recommended.</small></div>
+        </label>
+      </div>
+      <div class="row">
+        <label class="sw"><input type="checkbox" id="startMin" checked><span></span>
+          <div><b>Start hidden</b>
+          <small>When Windows starts it, stay in the notification area instead of opening a window.</small></div>
+        </label>
+      </div>
+      <div class="row">
+        <label class="sw"><input type="checkbox" id="closeTray" checked><span></span>
+          <div><b>Close to the notification area</b>
+          <small>Closing the window keeps attendance syncing. The icon stays in the tray.</small></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Check</h2>
+      <div class="rout">
+        <div class="rt"><b id="stRunning">—</b><small>Attendance server</small></div>
+        <div class="rt"><b id="stTerm">—</b><small>Terminals online</small></div>
+        <div class="rt"><b id="stPunch">—</b><small>Punches held</small></div>
+        <div class="rt"><b id="stUp">—</b><small>Uptime</small></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnRestart">Restart server</button>
+        <button class="btn" id="btnToggleHost">Stop server</button>
+        <button class="btn" id="btnRefresh2">Refresh status</button>
+        <span class="spacer"></span>
+        <button class="btn" id="btnStatusPage">Open status page ↗</button>
+      </div>
+      <div id="hostMsg"></div>
+      <p class="hint" style="margin:12px 0 0">Stopping the server makes the app unreachable from other
+        devices and pauses attendance. Everything you have already entered stays in the app.</p>
+    </div>
+  </section>
+
+  <!-- ================= TERMINALS ================= -->
+  <section class="page" id="pg2">
+    <h1>Biometric terminals</h1>
+    <p class="lede">Add the ZKTeco K40 and K50i on your network. You can skip this and add them later — the rest of AMAYA works without them.</p>
+
+    <div class="card">
+      <div class="chead">
+        <h2>Find terminals on this network</h2>
+        <button class="btn" id="btnScan">Scan now</button>
+      </div>
+      <p class="hint">Looks for devices serving the ZKTeco interface. Takes about a minute.</p>
+      <div id="scanOut" class="console" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="chead">
+        <h2>Configured terminals</h2>
+        <button class="btn" id="btnAdd">＋ Add a terminal</button>
+      </div>
+      <div id="devList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Working hours</h2>
+      <p class="hint">Used to work out Present, Late, Half day and Early leave. A punch after the start time plus the grace period counts as late.</p>
+      <div class="grid3">
+        <label class="fld"><span>Shift starts</span><input class="inp" id="shStart" type="time" value="09:00"></label>
+        <label class="fld"><span>Shift ends</span><input class="inp" id="shEnd" type="time" value="18:00"></label>
+        <label class="fld"><span>Late grace (min)</span><input class="inp" id="shGrace" type="number" min="0" max="120" value="10"></label>
+        <label class="fld"><span>Half day under (hours)</span><input class="inp" id="shHalf" type="number" min="1" max="12" value="4"></label>
+        <label class="fld"><span>Early-leave grace (min)</span><input class="inp" id="shEarly" type="number" min="0" max="120" value="15"></label>
+        <label class="fld"><span>Weekend days</span>
+          <select class="inp" id="shWeek">
+            <option value="5,6">Friday &amp; Saturday</option>
+            <option value="6,0">Saturday &amp; Sunday</option>
+            <option value="0">Sunday only</option>
+            <option value="5">Friday only</option>
+            <option value="">None</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Test the connection</h2>
+      <p class="hint">Confirms the terminals speak a format the app can read, before you rely on the numbers.</p>
+      <div class="row"><button class="btn" id="btnDiag">Test terminals</button></div>
+      <div id="diagOut" class="console" hidden></div>
+    </div>
+  </section>
+
+  <!-- ================= REMOTE ================= -->
+  <section class="page" id="pg3">
+    <h1>Open it remotely</h1>
+    <p class="lede">Share these addresses to use AMAYA from a phone or another computer on the same network.</p>
+
+    <div class="card">
+      <h2>Links on this network</h2>
+      <div id="linkList" class="links"></div>
+    </div>
+
+    <div class="card">
+      <h2>From outside the office</h2>
+      <p class="hint">These addresses only work on your local network. To reach AMAYA from home or on the road, put it behind a secure tunnel rather than opening a port on your router.</p>
+      <div class="grid2">
+        <label class="fld"><span>Cloudflare tunnel</span>
+          <input class="inp" id="tunCf" readonly placeholder="not running">
+          <button class="btn sm" id="btnTunCf">Start a quick tunnel</button>
+          <small>Hands out a temporary https:// address. Nothing to install.</small>
+        </label>
+        <label class="fld"><span>ngrok</span>
+          <input class="inp" id="tunNg" readonly placeholder="not running">
+          <button class="btn sm" id="btnTunNg">Start ngrok</button>
+          <small>Only if you already have ngrok installed and set up.</small>
+        </label>
+      </div>
+      <div id="tunOut" class="console" hidden></div>
+    </div>
+
+    <div class="card">
+      <h2>What to share</h2>
+      <p class="hint">The live view needs no login — anyone with the link sees today's attendance only. The app itself asks for a sign-in.</p>
+      <div class="row">
+        <button class="btn" id="btnCopyApp">Copy the app link</button>
+        <button class="btn" id="btnCopyLive">Copy the live link</button>
+        <button class="btn" id="btnOpenApp">Open the app ↗</button>
+        <button class="btn" id="btnOpenLive">Open the live view ↗</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your data</h2>
+      <p class="hint">Settings, terminal list and attendance history.</p>
+      <div class="row">
+        <button class="btn" id="btnReveal">Show the settings file</button>
+        <span class="spacer"></span>
+        <span class="tiny mono" id="appInfo"></span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <button class="btn" id="btnBack" disabled>← Back</button>
+  <div class="spacer"></div>
+  <span id="dirty" class="tiny"> </span>
+  <button class="btn" id="btnSave">Save</button>
+  <button class="btn primary" id="btnNext">Next →</button>
+  <button class="btn primary" id="btnDone" hidden>Finish and open AMAYA ERP</button>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="setup.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AMAYA ERP</string>
+    <string name="title_activity_main">AMAYA ERP</string>
+    <string name="package_name">com.amaya.industries.erp</string>
+    <string name="custom_url_scheme">com.amaya.industries.erp</string>
+</resources>

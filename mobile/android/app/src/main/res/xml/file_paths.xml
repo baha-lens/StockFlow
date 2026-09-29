@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      The Share plugin hands files to other apps through this FileProvider, so
+      a file that is not covered here cannot be shared or saved. Exports land in
+      the app's external documents dir (Documents/AMAYA/...) and attachment
+      images in Documents/attachments/..., both under external-path.
+    -->
+    <external-path name="documents" path="Documents/" />
+    <external-path name="my_images" path="." />
+    <cache-path name="my_cache_images" path="." />
+</paths>
